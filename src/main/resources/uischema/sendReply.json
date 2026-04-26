@@ -1,0 +1,129 @@
+{
+  "connectorName": "solace",
+  "operationName": "sendReply",
+  "title": "Send Reply",
+  "help": "Send a reply to an inbound request message using the reply-to destination from the message context",
+  "elements": [
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "General",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "configRef",
+              "displayName": "Connection",
+              "inputType": "connection",
+              "allowedConnectionTypes": ["solace"],
+              "defaultType": "connection.solace",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "The connection to use for the operation."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Advanced",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "deliveryMode",
+              "displayName": "Delivery Mode",
+              "inputType": "combo",
+              "defaultValue": "DIRECT",
+              "comboValues": [
+                "DIRECT",
+                "PERSISTENT",
+                "NON_PERSISTENT"
+              ],
+              "helpTip": "Delivery mode: DIRECT, PERSISTENT, or NON_PERSISTENT."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "messageType",
+              "displayName": "Message Type",
+              "inputType": "combo",
+              "defaultValue": "TEXT",
+              "comboValues": [
+                "TEXT",
+                "BYTES",
+                "XML"
+              ],
+              "helpTip": "Message type: TEXT, BYTES, or XML. JSON payloads are auto-detected and carried as TEXT."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "applicationMessageType",
+              "displayName": "Application Message Type",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "helpTip": "Application-defined message type."
+            }
+          },
+          {
+            "type": "table",
+            "value": {
+              "name": "userProperties",
+              "displayName": "User Properties",
+              "description": "Key value pairs for user properties (for content-based routing and filtering)",
+              "tableKey": "propertyName",
+              "tableValue": "propertyValue",
+              "elements": [
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "propertyName",
+                    "displayName": "Name",
+                    "inputType": "string",
+                    "required": false,
+                    "helpTip": ""
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "propertyValue",
+                    "displayName": "Value",
+                    "inputType": "stringOrExpression",
+                    "required": false,
+                    "helpTip": ""
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "responseVariable",
+              "displayName": "Response Variable",
+              "inputType": "stringOrExpression",
+              "defaultValue": "solaceResponse",
+              "helpTip": "The name of the variable to which the output should be stored."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "overwriteBody",
+              "displayName": "Overwrite Body",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "helpTip": "Replace the Message Body in Message Context with the response."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

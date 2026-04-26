@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2026, WSO2 LLC. (http://www.wso2.org).
+  ~
+  ~ WSO2 LLC. licenses this file to you under the Apache License,
+  ~ Version 2.0 (the "License"); you may not use this file except
+  ~ in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~ http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing,
+  ~ software distributed under the License is distributed on an
+  ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  ~ KIND, either express or implied. See the License for the
+  ~ specific language governing permissions and limitations
+  ~ under the License.
+  -->
+<template name="sendReply" xmlns="http://ws.apache.org/ns/synapse">
+    <parameter name="name" description="The Solace connection name to use."/>
+    <parameter name="deliveryMode" description="Delivery mode: DIRECT, PERSISTENT, or NON_PERSISTENT (default: DIRECT)."/>
+    <parameter name="messageType" description="Message type: TEXT, BYTES, or XML (default: TEXT). JSON payloads are auto-detected and carried as TEXT."/>
+    <parameter name="correlationId" description="Correlation ID for the reply message. If omitted, the correlation ID from the inbound request is echoed."/>
+    <parameter name="priority" description="Message priority (0-255)."/>
+    <parameter name="timeToLive" description="Time to live in milliseconds."/>
+    <parameter name="applicationMessageId" description="Application-defined message ID for the reply. If omitted, the application message ID from the inbound request is echoed."/>
+    <parameter name="applicationMessageType" description="Application-defined message type."/>
+    <parameter name="senderId" description="Sender ID for the reply message."/>
+    <parameter name="userProperties" description="Custom user properties as JSON object (e.g., {&quot;region&quot;:&quot;US&quot;})."/>
+    <parameter name="dmqEligible" description="Whether the message is eligible for the Dead Message Queue (true/false)."/>
+    <parameter name="elidingEligible" description="Whether the message is eligible for eliding (true/false)."/>
+    <parameter name="expiration" description="Absolute message expiration time as a UTC epoch in milliseconds (0 means no expiration)."/>
+    <parameter name="responseVariable" description="The name of the variable to which the output should be stored."/>
+    <parameter name="overwriteBody" description="Replace the Message Body in Message Context with the response."/>
+    <sequence>
+        <class name="org.wso2.integration.connector.operation.SolaceSendReply"/>
+    </sequence>
+</template>

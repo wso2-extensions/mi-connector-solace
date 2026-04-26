@@ -1,0 +1,177 @@
+{
+  "connectorName": "solace",
+  "operationName": "sendRequest",
+  "title": "Send Request",
+  "help": "Send a request message and wait for a response (synchronous request-reply)",
+  "elements": [
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "General",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "configRef",
+              "displayName": "Connection",
+              "inputType": "connection",
+              "allowedConnectionTypes": ["solace"],
+              "defaultType": "connection.solace",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "The connection to use for the operation."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "destinationType",
+              "displayName": "Destination Type",
+              "inputType": "combo",
+              "defaultValue": "TOPIC",
+              "required": "true",
+              "comboValues": [
+                "TOPIC",
+                "QUEUE"
+              ],
+              "helpTip": "Destination type: TOPIC or QUEUE."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "destinationName",
+              "displayName": "Destination Name",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "Name of the topic or queue to send the request to."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "messageType",
+              "displayName": "Message Type",
+              "inputType": "combo",
+              "defaultValue": "TEXT",
+              "required": "false",
+              "comboValues": [
+                "TEXT",
+                "BYTES",
+                "XML"
+              ],
+              "helpTip": "Message type: TEXT, BYTES, or XML. JSON payloads are auto-detected and carried as TEXT."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "requestTimeout",
+              "displayName": "Request Timeout (ms)",
+              "inputType": "stringOrExpression",
+              "defaultValue": "30000",
+              "required": "false",
+              "helpTip": "Maximum time to wait for response in milliseconds (default: 30000)."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Advanced",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "deliveryMode",
+              "displayName": "Delivery Mode",
+              "inputType": "combo",
+              "defaultValue": "DIRECT",
+              "comboValues": [
+                "DIRECT",
+                "PERSISTENT",
+                "NON_PERSISTENT"
+              ],
+              "helpTip": "Delivery mode. DIRECT is valid only for TOPIC destinations (best-effort pub/sub). QUEUE destinations require PERSISTENT or NON_PERSISTENT (guaranteed delivery)."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "applicationMessageId",
+              "displayName": "Application Message ID",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "helpTip": "Application-defined message ID."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "applicationMessageType",
+              "displayName": "Application Message Type",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "helpTip": "Application-defined message type."
+            }
+          },
+          {
+            "type": "table",
+            "value": {
+              "name": "userProperties",
+              "displayName": "User Properties",
+              "description": "Key value pairs for user properties (for content-based routing and filtering)",
+              "tableKey": "propertyName",
+              "tableValue": "propertyValue",
+              "elements": [
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "propertyName",
+                    "displayName": "Name",
+                    "inputType": "string",
+                    "required": false,
+                    "helpTip": ""
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "propertyValue",
+                    "displayName": "Value",
+                    "inputType": "stringOrExpression",
+                    "required": false,
+                    "helpTip": ""
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "responseVariable",
+              "displayName": "Response Variable",
+              "inputType": "stringOrExpression",
+              "defaultValue": "solaceResponse",
+              "helpTip": "The name of the variable to which the output should be stored."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "overwriteBody",
+              "displayName": "Overwrite Body",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "helpTip": "Replace the Message Body in Message Context with the response."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

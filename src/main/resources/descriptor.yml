@@ -1,0 +1,7 @@
+dependencies: []
+
+repositories:
+  - id: "wso2-nexus"
+    url: "https://maven.wso2.org/nexus/content/groups/wso2-public/"
+  - id: "central"
+    url: "https://repo1.maven.org/maven2/"

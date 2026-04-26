@@ -1,0 +1,70 @@
+{
+  "connectorName": "solace",
+  "operationName": "nackMessage",
+  "title": "Nack Message",
+  "help": "Negatively acknowledge an inbound message. FAILED redelivers (up to max-redelivery), REJECTED routes to the Dead Message Queue. Requires the inbound endpoint to be configured with solace.autoAck=false and to declare required settlement outcomes (FAILED, REJECTED) on its consumer flow.",
+  "elements": [
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "General",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "outcomeType",
+              "displayName": "Outcome",
+              "inputType": "combo",
+              "comboValues": [
+                "FAILED",
+                "REJECTED"
+              ],
+              "defaultValue": "FAILED",
+              "required": "true",
+              "helpTip": "FAILED: broker redelivers the message (subject to max-redelivery, then DMQ if configured). REJECTED: broker routes immediately to DMQ, otherwise discards. Inbound endpoint must declare required settlement outcomes for this to work."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "description",
+              "displayName": "Description",
+              "inputType": "string",
+              "defaultValue": "",
+              "helpTip": "Description of the operation."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Advanced",
+        "isCollapsed": true,
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "responseVariable",
+              "displayName": "Response Variable",
+              "inputType": "stringOrExpression",
+              "defaultValue": "solaceNackResponse",
+              "helpTip": "Property name where the operation result is stored."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "overwriteBody",
+              "displayName": "Overwrite Body",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "helpTip": "Replace the Message Body in Message Context with the response of the operation."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
