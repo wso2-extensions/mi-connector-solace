@@ -63,7 +63,7 @@
               ],
               "helpTip": "Message type: TEXT, BYTES, or XML. JSON payloads are auto-detected and carried as TEXT."
             }
-          }
+          }  
         ]
       }
     },

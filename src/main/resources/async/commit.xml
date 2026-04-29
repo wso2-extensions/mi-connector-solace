@@ -1,0 +1,5 @@
+<template name="commit" xmlns="http://ws.apache.org/ns/synapse">
+    <sequence>
+        <class name="org.wso2.integration.connector.operation.SolaceCommit"/>
+    </sequence>
+</template>

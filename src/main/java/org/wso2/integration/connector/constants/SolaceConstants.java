@@ -175,4 +175,13 @@ public final class SolaceConstants {
     public static final String ACK_STATUS_TIMEOUT = "TIMEOUT";
     public static final String ACK_STATUS_NOT_APPLICABLE = "NOT_APPLICABLE";
     public static final String ACK_STATUS_NOT_REQUESTED = "NOT_REQUESTED";
+
+    // Transaction values
+    public static final String TX_CONNECTION_ID = "solace.tx.connectionId";
+    public static final String TX_TIMEOUT_MILLIS = "transactionTimeoutMillis";
+    public static final String DEFAULT_TX_TIMEOUT_MILLIS = "60000";
+    public static final String REQUIRE_TRANSACTION = "requireTransaction";
+    public static final String ACK_STATUS_TX_PENDING = "TX_PENDING";
+    public static final String ACK_STATUS_TX_COMMITTED = "TX_COMMITTED";
+    public static final String ACK_STATUS_TX_ROLLED_BACK = "TX_ROLLED_BACK";
 }

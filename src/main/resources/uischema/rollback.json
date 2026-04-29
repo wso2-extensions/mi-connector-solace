@@ -1,0 +1,27 @@
+{
+  "connectorName": "solace",
+  "operationName": "rollback",
+  "title": "Rollback Transaction",
+  "help": "Rolls back the current local transaction on the Solace connection. Subsequent solace.publishMessage calls will not be committed. Use this to undo changes made during the transaction.",
+  "elements": [
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "General",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "configRef",
+              "displayName": "Solace Connection",
+              "inputType": "connection",
+              "allowedConnectionTypes": ["SOLACE"],
+              "required": true,
+              "helpTip": "Select an existing Solace connection."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

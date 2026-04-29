@@ -31,6 +31,7 @@ import com.solacesystems.jcsmp.JCSMPRequestTimeoutException;
 import com.solacesystems.jcsmp.JCSMPSession;
 import com.solacesystems.jcsmp.JCSMPStreamingPublishCorrelatingEventHandler;
 import com.solacesystems.jcsmp.JCSMPTransportException;
+import com.solacesystems.jcsmp.ProducerFlowProperties;
 import com.solacesystems.jcsmp.Queue;
 import com.solacesystems.jcsmp.Requestor;
 import com.solacesystems.jcsmp.SDTException;
@@ -39,6 +40,7 @@ import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.XMLContentMessage;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageProducer;
+import com.solacesystems.jcsmp.transaction.TransactedSession;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -69,6 +71,9 @@ public class SolaceConnection implements Connection {
     private XMLMessageProducer producer;
     private XMLMessageConsumer consumer;
     private final String connectionId;
+    private TransactedSession txSession;
+    private XMLMessageProducer txProducer;
+    private final Object txLock = new Object();
 
     /**
      * Tracks in-flight guaranteed publishes when the caller asked to block for the broker ACK.
@@ -530,6 +535,85 @@ public class SolaceConnection implements Connection {
         return session != null && !session.isClosed();
     }
 
+    public TransactedSession getOrCreateTransactedSession() throws JCSMPException {
+        synchronized (txLock) {
+            if (txSession == null) {
+                txSession = session.createTransactedSession();
+                ProducerFlowProperties producerProps = new ProducerFlowProperties();
+                txProducer = txSession.createProducer(producerProps, new PublishEventHandler());
+                log.info("Transacted session created on connection: " + connectionId);
+            }
+            return txSession;
+        }
+    }
+
+    public void commitTransaction() throws JCSMPException {
+        synchronized (txLock) {
+            if (txSession == null) {
+                throw new JCSMPException("No active transaction on connection: " + connectionId);
+            }
+            try {
+                txSession.commit();
+                log.info("Transaction committed on connection: " + connectionId);
+            } finally {
+                closeTransactedSessionInternal();
+            }
+        }
+    }
+
+    public void rollbackTransaction() throws JCSMPException {
+        synchronized (txLock) {
+            if (txSession == null) {
+                throw new JCSMPException("No active transaction on connection: " + connectionId);
+            }
+            try {
+                txSession.rollback();
+                log.warn("Transaction rolled back on connection: " + connectionId);
+            } finally {
+                closeTransactedSessionInternal();
+            }
+        }
+    }
+
+    public boolean hasActiveTransaction() {
+        synchronized (txLock) { return txSession != null; }
+    }
+
+    private void closeTransactedSessionInternal() {
+        if (txProducer != null) { txProducer.close(); txProducer = null; }
+        if (txSession != null)  { txSession.close();  txSession = null;  }
+    }
+
+    public void closeTransactedSession() {
+        synchronized (txLock) { closeTransactedSessionInternal(); }
+    }
+
+    public PublishResult publishTransacted(String destinationType, String destinationName,
+                                       String payload, String deliveryMode, String messageType,
+                                       SolaceMessageProperties properties, String httpContentType)
+        throws JCSMPException {
+        synchronized (txLock) {
+            if (txProducer == null) {
+                throw new JCSMPException(
+                    "publishTransacted called but no transacted session active on connection: "
+                    + connectionId);
+            }
+            Destination destination = resolveDestination(destinationType, destinationName);
+            BytesXMLMessage msg = createMessage(messageType, payload);
+            if (httpContentType != null && !httpContentType.isEmpty()) {
+                msg.setHTTPContentType(httpContentType);
+            }
+            msg.setDeliveryMode(resolveDeliveryMode(deliveryMode));
+            applyMessageProperties(msg, properties);
+            // Stable correlation key per transacted publish — surfaced in the PublishResult and
+            // visible in broker-side message-spool browsing for "where did this message go" diagnostics.
+            String correlationKey = "tx-" + connectionId + "-" + System.nanoTime();
+            msg.setCorrelationKey(correlationKey);
+            txProducer.send(msg, destination);
+            return new PublishResult(SolaceConstants.ACK_STATUS_TX_PENDING, false, correlationKey, null);
+        }
+    }
+
     /**
      * Disconnects the session and releases resources.
      */
@@ -542,6 +626,9 @@ public class SolaceConnection implements Connection {
             producer.close();
             producer = null;
         }
+        // Always release transacted resources, even if the underlying session was already
+        // closed externally (e.g. during a reconnect storm) — prevents producer/session leaks.
+        closeTransactedSession();
         if (session != null && !session.isClosed()) {
             session.closeSession();
             log.info("Solace connection closed: " + connectionId);

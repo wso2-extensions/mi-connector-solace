@@ -9,8 +9,10 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.synapse.MessageContext;
+import org.apache.synapse.core.axis2.Axis2MessageContext;
 import org.json.JSONObject;
 import org.wso2.integration.connector.connection.SolaceConnection;
+import org.wso2.integration.connector.connection.TransactionRegistry;
 import org.wso2.integration.connector.constants.SolaceConstants;
 import org.wso2.integration.connector.core.AbstractConnectorOperation;
 import org.wso2.integration.connector.core.connection.ConnectionHandler;
@@ -34,12 +36,25 @@ public class SolacePublishMessage extends AbstractConnectorOperation {
         }
         ConnectionHandler handler = ConnectionHandler.getConnectionHandler();
 
+        String txId = (String) ((Axis2MessageContext) messageContext).getAxis2MessageContext()
+                .getProperty(SolaceConstants.TX_CONNECTION_ID);
+        boolean isTransactional = (txId != null);
+
+        SolaceConnection connection = null;
         try {
-            // Check what happens if connection broke after fetching
-            SolaceConnection connection = (SolaceConnection) handler.getConnection(SolaceConstants.CONNECTOR_NAME, connectionName);
-            if (connection == null || !connection.isConnected()) {
-                handleException("Solace connection is not available or not connected.", messageContext);
-                return;
+            if (isTransactional) {
+                connection = TransactionRegistry.get(txId);
+                if (connection == null) {
+                    handleException("Transaction " + txId + " not found", messageContext);
+                    return;
+                }
+            } else {
+                connection = (SolaceConnection) handler.getConnection(
+                        SolaceConstants.CONNECTOR_NAME, connectionName);
+                if (connection == null || !connection.isConnected()) {
+                    handleException("Solace connection is not available or not connected.", messageContext);
+                    return;
+                }
             }
 
             // Extract parameters
@@ -109,18 +124,30 @@ public class SolacePublishMessage extends AbstractConnectorOperation {
             boolean continueOnAckFailure = StringUtils.isNotEmpty(continueOnAckFailureStr)
                     && Boolean.parseBoolean(continueOnAckFailureStr);
 
+            if (isTransactional && waitForAck) {
+                log.info("waitForAck=true is ignored for transacted publishes.The atomicity is provided by solace.commit");
+            }
+
             // Publish the message
             try {
-                PublishResult result = connection.publish(destinationType, destinationName, payload,
-                        deliveryMode, messageType, msgProperties, waitForAck, ackTimeout, httpContentType);
+                PublishResult result;
+                if (isTransactional) {
+                    result = connection.publishTransacted(destinationType, destinationName, payload,
+                            deliveryMode, messageType, msgProperties, httpContentType);
+                } else {
+                    result = connection.publish(destinationType, destinationName, payload,
+                            deliveryMode, messageType, msgProperties, waitForAck, ackTimeout, httpContentType);
+                }
+
                 if (log.isDebugEnabled()) {
                     log.debug("Message '" + payload + "' published to " + destinationType + " '" + destinationName
                             + "' with delivery mode: " + deliveryMode + ", ackStatus=" + result.getAckStatus());
                 }
+
                 setResultInContext(messageContext, result, destinationType, destinationName, deliveryMode,
                         messageType, responseVariable);
 
-                if (!result.isAckReceived() && waitForAck && !continueOnAckFailure
+                if (!isTransactional && !result.isAckReceived() && waitForAck && !continueOnAckFailure
                         && (SolaceConstants.ACK_STATUS_NACK.equals(result.getAckStatus())
                         || SolaceConstants.ACK_STATUS_TIMEOUT.equals(result.getAckStatus()))) {
                     handleException("Publish failed for '" + destinationName + "': "
@@ -130,8 +157,10 @@ public class SolacePublishMessage extends AbstractConnectorOperation {
             } catch (JCSMPException e) {
                 handleException("Error publishing message to Solace: " + e.getMessage(), e, messageContext);
             } finally {
-                // Return the connection to the pool
-                handler.returnConnection(SolaceConstants.CONNECTOR_NAME, connectionName, connection);
+                // Pinned (transactional) connection stays held until commit/rollback
+                if (!isTransactional && connection != null) {
+                    handler.returnConnection(SolaceConstants.CONNECTOR_NAME, connectionName, connection);
+                }
             }
         } catch (Exception e) {
             handleException("Failed to get Solace connection: " + connectionName, e, messageContext);
