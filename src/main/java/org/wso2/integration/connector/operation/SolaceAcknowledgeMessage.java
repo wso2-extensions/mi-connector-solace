@@ -39,6 +39,9 @@ public class SolaceAcknowledgeMessage extends AbstractConnectorOperation {
 
         try {
             solaceMessage.ackMessage();
+            // Tell the inbound listener the message has been settled so it doesn't issue a
+            // second ack post-mediation.
+            messageContext.setProperty(SolaceConstants.SOLACE_INBOUND_MESSAGE_SETTLED, Boolean.TRUE);
 
             if (log.isDebugEnabled()) {
                 log.debug("Message acknowledged successfully. AckMessageId: " + solaceMessage.getAckMessageId());

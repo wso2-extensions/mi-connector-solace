@@ -63,6 +63,11 @@ public class SolaceNackMessage extends AbstractConnectorOperation {
             }
 
             solaceMessage.settle(outcome);
+            // Tell the inbound listener the message has been settled so it doesn't issue a
+            // second ack/nack post-mediation — the broker treats double-settlement as a
+            // protocol violation and (for FAILED) the conflicting ack disrupts redelivery
+            // counting, causing infinite redelivery.
+            messageContext.setProperty(SolaceConstants.SOLACE_INBOUND_MESSAGE_SETTLED, Boolean.TRUE);
 
             if (log.isDebugEnabled()) {
                 log.debug("Message negatively acknowledged with outcome " + outcome

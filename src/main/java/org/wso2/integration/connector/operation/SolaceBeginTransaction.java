@@ -14,27 +14,70 @@ public class SolaceBeginTransaction extends AbstractConnector {
 
     @Override
     public void connect(MessageContext messageContext) throws ConnectException {
+        // Nested begin would orphan the outer tx — its TX_CONNECTION_ID would be
+        // overwritten and the outer pinned connection could only be reclaimed by the watchdog.
+        log.info("solace.beginTransaction: invoked");
+        String existingTxId = (String) ((Axis2MessageContext) messageContext).getAxis2MessageContext()
+                .getProperty(SolaceConstants.TX_CONNECTION_ID);
+        if (existingTxId != null) {
+            log.info("solace.beginTransaction: rejected — active transaction already in scope: " + existingTxId);
+            throw new ConnectException(
+                    "solace.beginTransaction called inside an active transaction scope: " + existingTxId);
+        }
+        String connectionName = null;
+        SolaceConnection connection = null;
+        boolean registered = false;
         try {
-            String connectionName = (String) ConnectorUtils.lookupTemplateParamater(
-                    messageContext, SolaceConstants.NAME);
+            connectionName = (String) messageContext.getProperty(SolaceConstants.NAME);
+            if (connectionName == null) {
+                handleException("Connection name is not set.", messageContext);
+                return;
+            }
+            
             String timeoutStr = (String) ConnectorUtils.lookupTemplateParamater(
                     messageContext, SolaceConstants.TX_TIMEOUT_MILLIS);
             long timeoutMillis = (timeoutStr != null && !timeoutStr.isEmpty())
                     ? Long.parseLong(timeoutStr)
                     : Long.parseLong(SolaceConstants.DEFAULT_TX_TIMEOUT_MILLIS);
+            log.info("solace.beginTransaction: connectionName=" + connectionName
+                    + ", timeoutMillis=" + timeoutMillis);
 
-            SolaceConnection connection = (SolaceConnection) ConnectionHandler.getConnectionHandler()
+            connection = (SolaceConnection) ConnectionHandler.getConnectionHandler()
                     .getConnection(SolaceConstants.CONNECTOR_NAME, connectionName);
+            if (connection == null) {
+                log.info("solace.beginTransaction: connection '" + connectionName + "' not available from pool");
+                throw new ConnectException("Solace connection '" + connectionName + "' is not available");
+            }
+            log.info("solace.beginTransaction: pinned connection acquired (connectionId="
+                    + connection.getConnectionId() + ")");
 
             connection.getOrCreateTransactedSession();
+            log.info("solace.beginTransaction: transacted session ready on connectionId="
+                    + connection.getConnectionId());
+
             String txId = TransactionRegistry.register(connection, connectionName, timeoutMillis);
+            registered = true;
+            log.info("solace.beginTransaction: registered txId=" + txId + " in TransactionRegistry");
 
             ((Axis2MessageContext) messageContext).getAxis2MessageContext()
                     .setProperty(SolaceConstants.TX_CONNECTION_ID, txId);
 
-            log.info("Solace transaction started: " + txId
-                    + " (timeout=" + timeoutMillis + "ms)");
+            log.info("solace.beginTransaction: started txId=" + txId + " (timeout=" + timeoutMillis + "ms)");
         } catch (Exception e) {
+            log.error("solace.beginTransaction: failed (connectionName=" + connectionName + "): " + e.getMessage(), e);
+            // Registration didn't happen → ownership stays with us, return to pool so the
+            // connection isn't lost. Once registered, the registry owns the lifecycle
+            // (commit/rollback/watchdog will release it).
+            if (connection != null && !registered) {
+                try {
+                    ConnectionHandler.getConnectionHandler().returnConnection(
+                            SolaceConstants.CONNECTOR_NAME, connectionName, connection);
+                    log.info("solace.beginTransaction: returned unregistered connection to pool after failure");
+                } catch (Exception releaseEx) {
+                    log.warn("Failed to return Solace connection to pool after failed beginTransaction",
+                            releaseEx);
+                }
+            }
             throw new ConnectException(e, "Failed to begin Solace transaction");
         }
     }

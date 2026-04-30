@@ -37,35 +37,51 @@ public final class TransactionRegistry {
         entry.timeoutFuture = watchdog.schedule(() -> autoRollback(txId),
                 timeoutMillis, TimeUnit.MILLISECONDS);
         entries.put(txId, entry);
+        log.info("TransactionRegistry: registered txId=" + txId + " (connectionName=" + connectionName
+                + ", connectionId=" + connection.getConnectionId() + ", timeoutMillis=" + timeoutMillis
+                + ", activeCount=" + entries.size() + ")");
         return txId;
     }
 
     public static SolaceConnection get(String txId) {
         Entry e = entries.get(txId);
-        return e != null ? e.connection : null;
+        if (e == null) {
+            log.info("TransactionRegistry: lookup miss for txId=" + txId
+                    + " (activeCount=" + entries.size() + ")");
+            return null;
+        }
+        return e.connection;
     }
 
     public static Entry unregister(String txId) {
         Entry e = entries.remove(txId);
         if (e != null && e.timeoutFuture != null) {
             e.timeoutFuture.cancel(false);
+            log.info("TransactionRegistry: unregistered txId=" + txId
+                    + " (connectionName=" + e.connectionName + ", activeCount=" + entries.size() + ")");
             return e;
         }
+        log.info("TransactionRegistry: unregister miss for txId=" + txId
+                + " (activeCount=" + entries.size() + ")");
         return null;
     }
 
     private static void autoRollback(String txId) {
         Entry e = entries.remove(txId);
         if (e == null) return;
-        log.warn("Transaction " + txId + " timed out — auto-rolling back");
+        log.warn("Transaction " + txId + " timed out — auto-rolling back (connectionName="
+                + e.connectionName + ", connectionId=" + e.connection.getConnectionId() + ")");
         try {
             e.connection.rollbackTransaction();
+            log.info("TransactionRegistry: auto-rollback completed for txId=" + txId);
         } catch (Exception ex) {
             log.error("Auto-rollback failed for transaction " + txId, ex);
         } finally {
             try {
                 ConnectionHandler.getConnectionHandler().returnConnection(
                         SolaceConstants.CONNECTOR_NAME, e.connectionName, e.connection);
+                log.info("TransactionRegistry: returned connection to pool after auto-rollback for txId="
+                        + txId);
             } catch (Exception ex) {
                 log.error("Failed to return Solace connection to pool after auto-rollback for tx "
                         + txId, ex);

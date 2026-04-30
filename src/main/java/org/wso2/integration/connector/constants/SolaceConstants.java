@@ -140,6 +140,13 @@ public final class SolaceConstants {
     public static final String SOLACE_INBOUND_REPLY_TO = "solace.inbound.replyTo";
     public static final String SOLACE_INBOUND_CORRELATION_ID = "solace.inbound.correlationId";
     public static final String SOLACE_INBOUND_REPLY_TO_DESTINATION_TYPE = "solace.inbound.replyToDestinationType";
+    /**
+     * Set to {@code Boolean.TRUE} by acknowledgeMessage / nackMessage after they settle the
+     * inbound JCSMP message, signalling to the inbound endpoint that it must not settle the
+     * message again post-mediation. Must match
+     * {@code SolaceInboundConstants.SOLACE_INBOUND_MESSAGE_SETTLED} in the inbound module.
+     */
+    public static final String SOLACE_INBOUND_MESSAGE_SETTLED = "solace.inbound.message.settled";
 
     // NACK settlement outcomes
     public static final String OUTCOME_TYPE = "outcomeType";

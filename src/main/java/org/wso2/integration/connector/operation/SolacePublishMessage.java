@@ -39,15 +39,22 @@ public class SolacePublishMessage extends AbstractConnectorOperation {
         String txId = (String) ((Axis2MessageContext) messageContext).getAxis2MessageContext()
                 .getProperty(SolaceConstants.TX_CONNECTION_ID);
         boolean isTransactional = (txId != null);
+        if (isTransactional) {
+            log.info("solace.publishMessage: transactional path, txId=" + txId
+                    + ", connectionName=" + connectionName);
+        }
 
         SolaceConnection connection = null;
         try {
             if (isTransactional) {
                 connection = TransactionRegistry.get(txId);
                 if (connection == null) {
+                    log.info("solace.publishMessage: txId=" + txId + " not found in TransactionRegistry");
                     handleException("Transaction " + txId + " not found", messageContext);
                     return;
                 }
+                log.info("solace.publishMessage: txId=" + txId
+                        + " resolved to connectionId=" + connection.getConnectionId());
             } else {
                 connection = (SolaceConnection) handler.getConnection(
                         SolaceConstants.CONNECTOR_NAME, connectionName);
@@ -77,6 +84,17 @@ public class SolacePublishMessage extends AbstractConnectorOperation {
                     && SolaceConstants.DELIVERY_MODE_DIRECT.equalsIgnoreCase(deliveryMode)) {
                 handleException("Invalid delivery mode 'DIRECT' for QUEUE destination '" + destinationName
                         + "'. Queues require guaranteed delivery — use PERSISTENT or NON_PERSISTENT.",
+                        messageContext);
+                return;
+            }
+
+            // Transacted sessions only carry guaranteed messages — DIRECT bypasses the spool
+            // and has no rollback semantics, so the JCSMP transacted producer rejects it.
+            if (isTransactional
+                    && SolaceConstants.DELIVERY_MODE_DIRECT.equalsIgnoreCase(deliveryMode)) {
+                handleException("Invalid delivery mode 'DIRECT' inside a transaction (txId=" + txId
+                        + ", destination='" + destinationName + "'). Transacted sessions only support"
+                        + " guaranteed delivery — use PERSISTENT or NON_PERSISTENT.",
                         messageContext);
                 return;
             }
@@ -124,16 +142,21 @@ public class SolacePublishMessage extends AbstractConnectorOperation {
             boolean continueOnAckFailure = StringUtils.isNotEmpty(continueOnAckFailureStr)
                     && Boolean.parseBoolean(continueOnAckFailureStr);
 
-            if (isTransactional && waitForAck) {
-                log.info("waitForAck=true is ignored for transacted publishes.The atomicity is provided by solace.commit");
+            if (isTransactional && waitForAck && log.isDebugEnabled()) {
+                log.debug("waitForAck=true is ignored for transacted publishes — atomicity is provided by solace.commit");
             }
 
             // Publish the message
             try {
                 PublishResult result;
                 if (isTransactional) {
+                    log.info("solace.publishMessage: txId=" + txId + " sending transacted message to "
+                            + destinationType + " '" + destinationName + "' (deliveryMode=" + deliveryMode
+                            + ", messageType=" + messageType + ")");
                     result = connection.publishTransacted(destinationType, destinationName, payload,
                             deliveryMode, messageType, msgProperties, httpContentType);
+                    log.info("solace.publishMessage: txId=" + txId + " transacted send queued (correlationKey="
+                            + result.getCorrelationKey() + ", ackStatus=" + result.getAckStatus() + ")");
                 } else {
                     result = connection.publish(destinationType, destinationName, payload,
                             deliveryMode, messageType, msgProperties, waitForAck, ackTimeout, httpContentType);
@@ -156,14 +179,16 @@ public class SolacePublishMessage extends AbstractConnectorOperation {
                 }
             } catch (JCSMPException e) {
                 handleException("Error publishing message to Solace: " + e.getMessage(), e, messageContext);
-            } finally {
-                // Pinned (transactional) connection stays held until commit/rollback
-                if (!isTransactional && connection != null) {
-                    handler.returnConnection(SolaceConstants.CONNECTOR_NAME, connectionName, connection);
-                }
             }
         } catch (Exception e) {
-            handleException("Failed to get Solace connection: " + connectionName, e, messageContext);
+            handleException("Solace publish operation failed (connection: " + connectionName + ")",
+                    e, messageContext);
+        } finally {
+            // Pinned (transactional) connection stays held until commit/rollback.
+            // Outer finally so early returns from validation also release the pooled connection.
+            if (!isTransactional && connection != null) {
+                handler.returnConnection(SolaceConstants.CONNECTOR_NAME, connectionName, connection);
+            }
         }
     }
 

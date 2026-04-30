@@ -1,8 +1,8 @@
 <template name="beginTransaction" xmlns="http://ws.apache.org/ns/synapse">
+    <parameter name="name" description="The Solace connection name to use."/>
     <parameter name="transactionTimeoutMillis"
                description="Auto-rollback after this many ms if commit/rollback isn't called. Default 60000."/>
     <sequence>
-        <property expression="$func:transactionTimeoutMillis" name="transactionTimeoutMillis"/>
         <class name="org.wso2.integration.connector.operation.SolaceBeginTransaction"/>
     </sequence>
 </template>

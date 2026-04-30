@@ -538,10 +538,24 @@ public class SolaceConnection implements Connection {
     public TransactedSession getOrCreateTransactedSession() throws JCSMPException {
         synchronized (txLock) {
             if (txSession == null) {
-                txSession = session.createTransactedSession();
-                ProducerFlowProperties producerProps = new ProducerFlowProperties();
-                txProducer = txSession.createProducer(producerProps, new PublishEventHandler());
-                log.info("Transacted session created on connection: " + connectionId);
+                log.info("Creating new transacted session on connection: " + connectionId);
+                // Build into a local first so a producer-create failure can't leave the
+                // connection with txSession set but txProducer null — that state would
+                // poison the connection for every subsequent borrower from the pool.
+                TransactedSession newSession = session.createTransactedSession();
+                try {
+                    ProducerFlowProperties producerProps = new ProducerFlowProperties();
+                    txProducer = newSession.createProducer(producerProps, new PublishEventHandler());
+                    txSession = newSession;
+                    log.info("Transacted session created on connection: " + connectionId);
+                } catch (JCSMPException e) {
+                    log.error("Failed to create transacted producer on connection: " + connectionId
+                            + " — closing transacted session: " + e.getMessage(), e);
+                    try { newSession.close(); } catch (Exception ignored) { }
+                    throw e;
+                }
+            } else {
+                log.info("Reusing existing transacted session on connection: " + connectionId);
             }
             return txSession;
         }
@@ -550,13 +564,21 @@ public class SolaceConnection implements Connection {
     public void commitTransaction() throws JCSMPException {
         synchronized (txLock) {
             if (txSession == null) {
+                log.error("commitTransaction called but no active transacted session on connection: "
+                        + connectionId);
                 throw new JCSMPException("No active transaction on connection: " + connectionId);
             }
+            log.info("Committing transacted session on connection: " + connectionId);
             try {
                 txSession.commit();
                 log.info("Transaction committed on connection: " + connectionId);
+            } catch (JCSMPException e) {
+                log.error("Transacted session commit failed on connection: " + connectionId
+                        + ": " + e.getMessage(), e);
+                throw e;
             } finally {
                 closeTransactedSessionInternal();
+                log.info("Transacted session closed on connection: " + connectionId + " (post-commit)");
             }
         }
     }
@@ -564,13 +586,21 @@ public class SolaceConnection implements Connection {
     public void rollbackTransaction() throws JCSMPException {
         synchronized (txLock) {
             if (txSession == null) {
+                log.error("rollbackTransaction called but no active transacted session on connection: "
+                        + connectionId);
                 throw new JCSMPException("No active transaction on connection: " + connectionId);
             }
+            log.info("Rolling back transacted session on connection: " + connectionId);
             try {
                 txSession.rollback();
                 log.warn("Transaction rolled back on connection: " + connectionId);
+            } catch (JCSMPException e) {
+                log.error("Transacted session rollback failed on connection: " + connectionId
+                        + ": " + e.getMessage(), e);
+                throw e;
             } finally {
                 closeTransactedSessionInternal();
+                log.info("Transacted session closed on connection: " + connectionId + " (post-rollback)");
             }
         }
     }
@@ -594,6 +624,8 @@ public class SolaceConnection implements Connection {
         throws JCSMPException {
         synchronized (txLock) {
             if (txProducer == null) {
+                log.error("publishTransacted called but no transacted session active on connection: "
+                        + connectionId);
                 throw new JCSMPException(
                     "publishTransacted called but no transacted session active on connection: "
                     + connectionId);
@@ -609,7 +641,17 @@ public class SolaceConnection implements Connection {
             // visible in broker-side message-spool browsing for "where did this message go" diagnostics.
             String correlationKey = "tx-" + connectionId + "-" + System.nanoTime();
             msg.setCorrelationKey(correlationKey);
-            txProducer.send(msg, destination);
+            log.info("publishTransacted: sending to " + destinationType + " '" + destinationName
+                    + "' on connectionId=" + connectionId + " (correlationKey=" + correlationKey + ")");
+            try {
+                txProducer.send(msg, destination);
+            } catch (JCSMPException e) {
+                log.error("publishTransacted: send failed on connectionId=" + connectionId
+                        + " (correlationKey=" + correlationKey + "): " + e.getMessage(), e);
+                throw e;
+            }
+            log.info("publishTransacted: send returned (pending commit) on connectionId=" + connectionId
+                    + " (correlationKey=" + correlationKey + ")");
             return new PublishResult(SolaceConstants.ACK_STATUS_TX_PENDING, false, correlationKey, null);
         }
     }
