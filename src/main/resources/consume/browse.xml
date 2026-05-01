@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2026, WSO2 LLC. (http://www.wso2.org).
+  ~
+  ~ WSO2 LLC. licenses this file to you under the Apache License,
+  ~ Version 2.0 (the "License"); you may not use this file except
+  ~ in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~ http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing,
+  ~ software distributed under the License is distributed on an
+  ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  ~ KIND, either express or implied. See the License for the
+  ~ specific language governing permissions and limitations
+  ~ under the License.
+  -->
+<template name="browse" xmlns="http://ws.apache.org/ns/synapse">
+    <parameter name="name" description="The Solace connection name to use."/>
+    <parameter name="queueName" description="Name of the queue to browse."/>
+    <parameter name="maxMessages" description="Maximum number of messages to return (default: 10)."/>
+    <parameter name="browseTimeout" description="Maximum time to wait per message read in milliseconds (default: 2000). Browse stops once no message arrives within this window."/>
+    <parameter name="selector" description="Optional JMS-style selector expression to filter messages (e.g., region = 'EU' AND priority &gt; 5)."/>
+    <parameter name="responseVariable" description="The name of the variable to which the result JSON (with messages array) is stored."/>
+    <parameter name="overwriteBody" description="Unused for browse — messages are returned via the response variable."/>
+    <sequence>
+        <class name="org.wso2.integration.connector.operation.SolaceBrowseQueue"/>
+    </sequence>
+</template>

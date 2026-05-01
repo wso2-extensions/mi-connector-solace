@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2026, WSO2 LLC. (http://www.wso2.org).
+  ~
+  ~ WSO2 LLC. licenses this file to you under the Apache License,
+  ~ Version 2.0 (the "License"); you may not use this file except
+  ~ in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~ http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing,
+  ~ software distributed under the License is distributed on an
+  ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  ~ KIND, either express or implied. See the License for the
+  ~ specific language governing permissions and limitations
+  ~ under the License.
+  -->
+<template name="poll" xmlns="http://ws.apache.org/ns/synapse">
+    <parameter name="name" description="The Solace connection name to use."/>
+    <parameter name="queueName" description="Name of the queue to poll."/>
+    <parameter name="pollTimeout" description="Maximum time to wait for a message in milliseconds (default: 5000). SETTLEMENT: outside a transaction the message is acked on receipt and mediation failure loses it; inside beginTransaction the message is held until commit (ack) or rollback (redeliver)."/>
+    <parameter name="selector" description="Optional JMS-style selector expression to filter messages (e.g., region = 'EU' AND priority &gt; 5)."/>
+    <parameter name="responseVariable" description="The name of the variable to which the result JSON is stored."/>
+    <parameter name="overwriteBody" description="If true, replace the message body with the polled message's payload."/>
+    <sequence>
+        <class name="org.wso2.integration.connector.operation.SolacePollMessage"/>
+    </sequence>
+</template>

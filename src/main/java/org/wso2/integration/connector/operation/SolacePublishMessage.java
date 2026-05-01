@@ -1,7 +1,21 @@
 /*
- * Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com)
- * Licensed under the Apache License, Version 2.0
+ * Copyright (c) 2026, WSO2 LLC. (http://www.wso2.org).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
+
 package org.wso2.integration.connector.operation;
 
 import com.solacesystems.jcsmp.JCSMPException;
@@ -12,7 +26,7 @@ import org.apache.synapse.MessageContext;
 import org.apache.synapse.core.axis2.Axis2MessageContext;
 import org.json.JSONObject;
 import org.wso2.integration.connector.connection.SolaceConnection;
-import org.wso2.integration.connector.connection.TransactionRegistry;
+import org.wso2.integration.connector.connection.SolaceTransactionRegistry;
 import org.wso2.integration.connector.constants.SolaceConstants;
 import org.wso2.integration.connector.core.AbstractConnectorOperation;
 import org.wso2.integration.connector.core.connection.ConnectionHandler;
@@ -20,6 +34,9 @@ import org.wso2.integration.connector.core.util.ConnectorUtils;
 import org.wso2.integration.connector.models.PublishResult;
 import org.wso2.integration.connector.models.SolaceMessageProperties;
 import org.wso2.integration.connector.utils.SolaceUtils;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Publishes a message to Solace (operation class).
@@ -47,7 +64,7 @@ public class SolacePublishMessage extends AbstractConnectorOperation {
         SolaceConnection connection = null;
         try {
             if (isTransactional) {
-                connection = TransactionRegistry.get(txId);
+                connection = SolaceTransactionRegistry.get(txId);
                 if (connection == null) {
                     log.info("solace.publishMessage: txId=" + txId + " not found in TransactionRegistry");
                     handleException("Transaction " + txId + " not found", messageContext);
@@ -168,7 +185,7 @@ public class SolacePublishMessage extends AbstractConnectorOperation {
                 }
 
                 setResultInContext(messageContext, result, destinationType, destinationName, deliveryMode,
-                        messageType, responseVariable);
+                        messageType, responseVariable, overwriteBody);
 
                 if (!isTransactional && !result.isAckReceived() && waitForAck && !continueOnAckFailure
                         && (SolaceConstants.ACK_STATUS_NACK.equals(result.getAckStatus())
@@ -194,7 +211,8 @@ public class SolacePublishMessage extends AbstractConnectorOperation {
 
     private void setResultInContext(MessageContext messageContext, PublishResult result,
                                     String destinationType, String destinationName, String deliveryMode,
-                                    String messageType, String responseVariable) {
+                                    String messageType, String responseVariable, Boolean overwriteBody) {
+        // Legacy solace.* context properties — kept for callers that read them directly.
         messageContext.setProperty(SolaceConstants.SOLACE_DESTINATION, destinationName);
         messageContext.setProperty(SolaceConstants.SOLACE_DELIVERY_MODE, deliveryMode);
         messageContext.setProperty(SolaceConstants.SOLACE_ACK_STATUS, result.getAckStatus());
@@ -206,18 +224,33 @@ public class SolacePublishMessage extends AbstractConnectorOperation {
             messageContext.setProperty(SolaceConstants.SOLACE_ACK_ERROR, result.getError());
         }
 
-        if (StringUtils.isNotEmpty(responseVariable)) {
-            JSONObject response = new JSONObject();
-            response.put("destination", destinationName);
-            response.put("destinationType", destinationType);
-            response.put("deliveryMode", deliveryMode);
-            response.put("messageType", messageType);
-            response.put("ackStatus", result.getAckStatus());
-            response.put("ackReceived", result.isAckReceived());
-            response.put("correlationKey", result.getCorrelationKey() != null ? result.getCorrelationKey() : JSONObject.NULL);
-            response.put("error", result.getError() != null ? result.getError() : JSONObject.NULL);
-            response.put("publishedAt", System.currentTimeMillis());
-            messageContext.setProperty(responseVariable, response.toString());
+        // Build the full publish-result envelope and route it through the framework helper
+        // so ${vars.X} resolves and overwriteBody behaves like other connectors.
+        JSONObject response = new JSONObject();
+        response.put("destination", destinationName);
+        response.put("destinationType", destinationType);
+        response.put("deliveryMode", deliveryMode);
+        response.put("messageType", messageType);
+        response.put("ackStatus", result.getAckStatus());
+        response.put("ackReceived", result.isAckReceived());
+        response.put("correlationKey", result.getCorrelationKey() != null ? result.getCorrelationKey() : JSONObject.NULL);
+        response.put("error", result.getError() != null ? result.getError() : JSONObject.NULL);
+        response.put("publishedAt", System.currentTimeMillis());
+
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("destination", destinationName);
+        attributes.put("destinationType", destinationType);
+        attributes.put("deliveryMode", deliveryMode);
+        attributes.put("ackStatus", result.getAckStatus());
+        attributes.put("ackReceived", result.isAckReceived());
+        if (result.getCorrelationKey() != null) {
+            attributes.put("correlationKey", result.getCorrelationKey());
         }
+        if (result.getError() != null) {
+            attributes.put("error", result.getError());
+        }
+
+        handleConnectorResponse(messageContext, responseVariable, overwriteBody,
+                response.toString(), null, attributes);
     }
 }

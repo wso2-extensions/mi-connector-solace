@@ -1,0 +1,137 @@
+{
+  "connectorName": "solace",
+  "operationName": "requestCachedMessages",
+  "title": "Request Cached Messages",
+  "help": "Requests historical messages from a Solace PubSub+ Cache Instance for a topic. PREREQUISITES: A PubSub+ Cache Instance must (1) be deployed and joined to the Message VPN, (2) be configured to cache the requested topic pattern, and (3) the cache instance name passed here must match the broker's configuration. The connector cannot detect missing cache infrastructure ahead of time — the broker returns an error if any prerequisite is not met.",
+  "elements": [
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "General",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "configRef",
+              "displayName": "Connection",
+              "inputType": "connection",
+              "allowedConnectionTypes": ["solace"],
+              "defaultType": "connection.solace",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "The connection to use for the operation."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "cacheName",
+              "displayName": "Cache Instance Name",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "REQUIRED. Name of the PubSub+ Cache Instance configured on the broker for this VPN. The instance must be deployed, joined to the VPN, and have caching enabled for the requested topic pattern. Verify in PubSub+ Manager: Cluster Manager > Cache Instances."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "topicPattern",
+              "displayName": "Topic Pattern",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "REQUIRED. Topic name or wildcard pattern to retrieve cached messages for (e.g., stock/AAPL or stock/>). The cache instance must already be subscribed to this pattern administratively — clients cannot create cache subscriptions on the fly."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Cache Request Options",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "cacheMaxMessages",
+              "displayName": "Max Messages",
+              "inputType": "stringOrExpression",
+              "defaultValue": "0",
+              "required": "false",
+              "helpTip": "Maximum cached messages to request. 0 means unlimited (subject to broker-side cache instance limits)."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "cacheMaxAgeSeconds",
+              "displayName": "Max Age (seconds)",
+              "inputType": "stringOrExpression",
+              "defaultValue": "0",
+              "required": "false",
+              "helpTip": "Maximum age of cached messages to return, in seconds. 0 means any age."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "cacheRequestTimeout",
+              "displayName": "Request Timeout (ms)",
+              "inputType": "stringOrExpression",
+              "defaultValue": "10000",
+              "required": "false",
+              "helpTip": "Maximum time the cache request itself may take in milliseconds. Default: 10000."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "liveDataAction",
+              "displayName": "Live Data Action",
+              "inputType": "combo",
+              "comboValues": [
+                "FULFILL",
+                "FLOW_THRU",
+                "QUEUE"
+              ],
+              "defaultValue": "FULFILL",
+              "required": "false",
+              "helpTip": "How live messages on the same topic interleave with cached delivery. FULFILL: cached messages first, then live (recommended for cold start). FLOW_THRU: interleave (lowest latency for live). QUEUE: queue live messages until cache delivery completes."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Advanced",
+        "isCollapsed": true,
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "responseVariable",
+              "displayName": "Response Variable",
+              "inputType": "stringOrExpression",
+              "defaultValue": "solaceCacheResponse",
+              "helpTip": "Property name where the result JSON is stored. Contains: cacheName, topicPattern, messageCount, messages (array of cached message summaries with payload + headers)."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "overwriteBody",
+              "displayName": "Overwrite Body",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "helpTip": "Unused for cache request — messages are returned via the response variable."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "connectorName": "solace",
+  "operationName": "browse",
+  "title": "Browse Queue",
+  "help": "Browses messages on a Solace queue without consuming them. Live consumers continue to see the same messages.",
+  "elements": [
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "General",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "configRef",
+              "displayName": "Connection",
+              "inputType": "connection",
+              "allowedConnectionTypes": ["solace"],
+              "defaultType": "connection.solace",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "The connection to use for the operation."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "queueName",
+              "displayName": "Queue Name",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "Name of the queue to browse."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "maxMessages",
+              "displayName": "Max Messages",
+              "inputType": "stringOrExpression",
+              "defaultValue": "10",
+              "required": "false",
+              "helpTip": "Maximum number of messages to return. Default: 10."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Advanced",
+        "isCollapsed": true,
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "browseTimeout",
+              "displayName": "Browse Timeout (ms)",
+              "inputType": "stringOrExpression",
+              "defaultValue": "2000",
+              "required": "false",
+              "helpTip": "Maximum time to wait per message read in milliseconds. Browse stops once no message arrives within this window. Default: 2000."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "selector",
+              "displayName": "Selector",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "required": "false",
+              "helpTip": "Optional JMS-style selector expression for filtering (e.g., region = 'EU' AND priority > 5). Leave blank to match any message."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "responseVariable",
+              "displayName": "Response Variable",
+              "inputType": "stringOrExpression",
+              "defaultValue": "solaceBrowseResponse",
+              "helpTip": "Property name where the result JSON is stored. Contains: destination, messageCount, messages (array of message summaries with payload + headers)."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "overwriteBody",
+              "displayName": "Overwrite Body",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "helpTip": "Unused for browse — messages are returned via the response variable."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,7 +1,21 @@
 /*
- * Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com)
- * Licensed under the Apache License, Version 2.0
+ * Copyright (c) 2026, WSO2 LLC. (http://www.wso2.org).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
+
 package org.wso2.integration.connector.operation;
 
 import com.solacesystems.jcsmp.BytesXMLMessage;
@@ -10,6 +24,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.synapse.MessageContext;
+import org.json.JSONObject;
 import org.wso2.integration.connector.connection.SolaceConnection;
 import org.wso2.integration.connector.constants.SolaceConstants;
 import org.wso2.integration.connector.core.AbstractConnectorOperation;
@@ -17,6 +32,9 @@ import org.wso2.integration.connector.core.connection.ConnectionHandler;
 import org.wso2.integration.connector.core.util.ConnectorUtils;
 import org.wso2.integration.connector.models.SolaceMessageProperties;
 import org.wso2.integration.connector.utils.SolaceUtils;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Sends a reply to an inbound request message using JCSMP's native sendReply API.
@@ -94,7 +112,7 @@ public class SolaceSendReply extends AbstractConnectorOperation {
             connection.sendReply(inboundMessage, payload, deliveryMode, messageType, msgProperties,
                     httpContentType);
 
-            // Set success properties
+            // Legacy solace.* context properties — kept for callers that read them directly.
             String replyToName = inboundMessage.getReplyTo() != null
                     ? inboundMessage.getReplyTo().getName() : "unknown";
             messageContext.setProperty(SolaceConstants.SOLACE_DESTINATION, replyToName);
@@ -105,6 +123,30 @@ public class SolaceSendReply extends AbstractConnectorOperation {
                         + (inboundMessage.getCorrelationId() != null
                                 ? " with correlationId: " + inboundMessage.getCorrelationId() : ""));
             }
+
+            // Build the response envelope so ${vars.X.payload.sent} resolves and
+            // overwriteBody behaves consistently with other framework operations.
+            JSONObject response = new JSONObject();
+            response.put("sent", true);
+            response.put("replyTo", replyToName);
+            response.put("deliveryMode", deliveryMode);
+            response.put("messageType", messageType);
+            if (inboundMessage.getCorrelationId() != null) {
+                response.put("correlationId", inboundMessage.getCorrelationId());
+            }
+            response.put("repliedAt", System.currentTimeMillis());
+
+            Map<String, Object> attributes = new HashMap<>();
+            attributes.put("sent", true);
+            attributes.put("replyTo", replyToName);
+            attributes.put("deliveryMode", deliveryMode);
+            if (inboundMessage.getCorrelationId() != null) {
+                attributes.put("correlationId", inboundMessage.getCorrelationId());
+            }
+            log.info("response: "+ response.toString() + " responseVariable: " + responseVariable 
+            + " overwriteBody: " + overwriteBody + "Attributes: " + attributes.toString());
+            handleConnectorResponse(messageContext, responseVariable, overwriteBody,
+                    response.toString(), null, attributes);
 
         } catch (JCSMPException e) {
             handleException("Error sending reply to Solace: " + e.getMessage(), e, messageContext);

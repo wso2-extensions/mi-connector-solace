@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.org).
+ * Copyright (c) 2026, WSO2 LLC. (http://www.wso2.org).
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -18,11 +18,18 @@
 
 package org.wso2.integration.connector.connection;
 
+import com.solacesystems.jcsmp.Browser;
+import com.solacesystems.jcsmp.BrowserProperties;
 import com.solacesystems.jcsmp.BytesMessage;
 import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.CacheLiveDataAction;
+import com.solacesystems.jcsmp.CacheRequestResult;
+import com.solacesystems.jcsmp.CacheSession;
+import com.solacesystems.jcsmp.CacheSessionProperties;
 import com.solacesystems.jcsmp.ConsumerFlowProperties;
 import com.solacesystems.jcsmp.DeliveryMode;
 import com.solacesystems.jcsmp.Destination;
+import com.solacesystems.jcsmp.EndpointProperties;
 import com.solacesystems.jcsmp.FlowReceiver;
 import com.solacesystems.jcsmp.JCSMPErrorResponseException;
 import com.solacesystems.jcsmp.JCSMPException;
@@ -37,11 +44,14 @@ import com.solacesystems.jcsmp.Requestor;
 import com.solacesystems.jcsmp.SDTException;
 import com.solacesystems.jcsmp.SDTMap;
 import com.solacesystems.jcsmp.TextMessage;
+import com.solacesystems.jcsmp.Topic;
 import com.solacesystems.jcsmp.XMLContentMessage;
 import com.solacesystems.jcsmp.XMLMessageConsumer;
 import com.solacesystems.jcsmp.XMLMessageProducer;
 import com.solacesystems.jcsmp.transaction.TransactedSession;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -73,6 +83,16 @@ public class SolaceConnection implements Connection {
     private final String connectionId;
     private TransactedSession txSession;
     private XMLMessageProducer txProducer;
+    /**
+     * Transacted FlowReceivers, one per queue name, lazily created the first time the
+     * caller polls a given queue inside the current transaction. The selector each
+     * receiver was created with is recorded so subsequent polls of the same queue can
+     * be rejected if they request a different filter — JCSMP binds selectors at flow
+     * creation, so a mismatch on reuse would silently apply the wrong filter.
+     * Lifecycle is bound to {@link #txSession}: all receivers are closed in
+     * {@link #closeTransactedSessionInternal} on commit/rollback.
+     */
+    private final Map<String, TxFlowEntry> txFlowReceivers = new ConcurrentHashMap<>();
     private final Object txLock = new Object();
 
     /**
@@ -610,6 +630,20 @@ public class SolaceConnection implements Connection {
     }
 
     private void closeTransactedSessionInternal() {
+        // Close any transacted FlowReceivers first — they live on the txSession and would
+        // otherwise be orphaned by closing the session out from under them.
+        if (!txFlowReceivers.isEmpty()) {
+            for (Map.Entry<String, TxFlowEntry> entry : txFlowReceivers.entrySet()) {
+                try {
+                    entry.getValue().receiver.close();
+                } catch (Exception e) {
+                    log.warn("Error closing transacted flow receiver for queue '"
+                            + entry.getKey() + "' on connection " + connectionId + ": "
+                            + e.getMessage());
+                }
+            }
+            txFlowReceivers.clear();
+        }
         if (txProducer != null) { txProducer.close(); txProducer = null; }
         if (txSession != null)  { txSession.close();  txSession = null;  }
     }
@@ -653,6 +687,296 @@ public class SolaceConnection implements Connection {
             log.info("publishTransacted: send returned (pending commit) on connectionId=" + connectionId
                     + " (correlationKey=" + correlationKey + ")");
             return new PublishResult(SolaceConstants.ACK_STATUS_TX_PENDING, false, correlationKey, null);
+        }
+    }
+
+    /**
+     * Synchronously polls one message from a queue inside the active transaction. The
+     * message is held by the broker until the surrounding transaction commits (then acked
+     * and removed) or rolls back (then redelivered) — the caller does not (and cannot)
+     * settle it manually.
+     *
+     * <p>Provisions a transacted FlowReceiver on the txSession the first time a given
+     * queue is polled in this transaction; subsequent polls of the same queue reuse the
+     * same receiver. All receivers are closed by {@link #closeTransactedSessionInternal}
+     * on commit/rollback.</p>
+     *
+     * @param queueName     the durable queue to poll
+     * @param timeoutMillis maximum time to block waiting for a message
+     * @param selector      optional JMS-style selector expression (may be null);
+     *                      ignored on subsequent calls if the receiver already exists
+     * @return the received message, or null on timeout
+     * @throws JCSMPException if no transacted session is active, or flow setup / receive fails
+     */
+    public BytesXMLMessage pollTransacted(String queueName, long timeoutMillis, String selector)
+            throws JCSMPException {
+        synchronized (txLock) {
+            if (txSession == null) {
+                log.error("pollTransacted called but no transacted session active on connection: "
+                        + connectionId);
+                throw new JCSMPException(
+                        "pollTransacted called but no transacted session active on connection: "
+                        + connectionId);
+            }
+
+            String normalizedSelector = (selector == null || selector.isEmpty()) ? null : selector;
+            TxFlowEntry entry = txFlowReceivers.get(queueName);
+            if (entry == null) {
+                Queue queue = JCSMPFactory.onlyInstance().createQueue(queueName);
+                ConsumerFlowProperties flowProps = new ConsumerFlowProperties();
+                flowProps.setEndpoint(queue);
+                flowProps.setStartState(true);
+                if (normalizedSelector != null) {
+                    flowProps.setSelector(normalizedSelector);
+                }
+                EndpointProperties endpointProps = new EndpointProperties();
+                endpointProps.setAccessType(EndpointProperties.ACCESSTYPE_NONEXCLUSIVE);
+
+                log.info("pollTransacted: creating transacted flow for queue '" + queueName
+                        + "' on connectionId=" + connectionId
+                        + (normalizedSelector != null ? " (selector='" + normalizedSelector + "')" : ""));
+                // Settlement on a transacted flow is implicit (commit/rollback), so we do NOT
+                // set CLIENT_ACK mode here — that's only for the non-transacted poll path.
+                FlowReceiver receiver = txSession.createFlow(null, flowProps, endpointProps);
+                entry = new TxFlowEntry(receiver, normalizedSelector);
+                txFlowReceivers.put(queueName, entry);
+            } else if (!java.util.Objects.equals(entry.selector, normalizedSelector)) {
+                // JCSMP binds the selector at flow-creation time. Silently ignoring the new
+                // selector and reusing a flow with a different filter would be a correctness
+                // bug — reject the call so the caller can split this into a separate
+                // transaction (one selector per queue per tx).
+                throw new JCSMPException(
+                        "pollTransacted: selector mismatch on queue '" + queueName + "' (existing='"
+                        + entry.selector + "', requested='" + normalizedSelector + "'). A queue's"
+                        + " transacted flow is created once per transaction with a fixed selector;"
+                        + " use only one selector per queue within a single transaction.");
+            }
+
+            return entry.receiver.receive((int) timeoutMillis);
+        }
+    }
+
+    /**
+     * Bookkeeping for a transacted FlowReceiver — pairs the receiver with the selector
+     * it was created with so we can reject mismatched reuses inside the same transaction.
+     */
+    private static final class TxFlowEntry {
+        final FlowReceiver receiver;
+        final String selector;
+        TxFlowEntry(FlowReceiver receiver, String selector) {
+            this.receiver = receiver;
+            this.selector = selector;
+        }
+    }
+
+    /**
+     * Synchronously polls one message from a queue and acknowledges it on receipt.
+     * Provisions a short-lived FlowReceiver on the queue, waits up to {@code timeoutMillis}
+     * for a message, acks it (so the broker removes it from the queue), and tears the flow
+     * down before returning.
+     *
+     * <p><b>Settlement is atomic with consumption</b> — manual ack/nack of polled messages
+     * is not supported because the flow closes before mediation continues. For atomic
+     * consume-then-publish or rollback-on-failure semantics, wrap publish operations in
+     * {@code beginTransaction} / {@code commit} (consumer-side transactional support).</p>
+     *
+     * @param queueName     the durable queue to poll
+     * @param timeoutMillis maximum time to block waiting for a message
+     * @param selector      optional JMS-style selector expression (may be null)
+     * @return the received message, or null on timeout
+     * @throws JCSMPException if flow setup or receive fails
+     */
+    public BytesXMLMessage pollMessage(String queueName, long timeoutMillis, String selector)
+            throws JCSMPException {
+        Queue queue = JCSMPFactory.onlyInstance().createQueue(queueName);
+
+        ConsumerFlowProperties flowProps = new ConsumerFlowProperties();
+        flowProps.setEndpoint(queue);
+        flowProps.setStartState(true);
+        flowProps.setAckMode(com.solacesystems.jcsmp.JCSMPProperties.SUPPORTED_MESSAGE_ACK_CLIENT);
+        if (selector != null && !selector.isEmpty()) {
+            flowProps.setSelector(selector);
+        }
+
+        EndpointProperties endpointProps = new EndpointProperties();
+        endpointProps.setAccessType(EndpointProperties.ACCESSTYPE_NONEXCLUSIVE);
+
+        FlowReceiver flowReceiver = null;
+        try {
+            flowReceiver = session.createFlow(null, flowProps, endpointProps);
+            BytesXMLMessage message = flowReceiver.receive((int) timeoutMillis);
+            if (message != null) {
+                message.ackMessage();
+            }
+            return message;
+        } finally {
+            if (flowReceiver != null) {
+                flowReceiver.close();
+            }
+        }
+    }
+
+    /**
+     * Browses messages on a queue without consuming them. Uses the JCSMP {@link Browser}
+     * API. The browser inspects the message-spool replicator without removing messages,
+     * so the same messages remain available to live consumers.
+     *
+     * @param queueName     the queue to browse
+     * @param maxMessages   maximum messages to collect; the loop stops earlier if no
+     *                      message arrives within {@code timeoutMillis}
+     * @param timeoutMillis per-message wait — how long to block between successive
+     *                      {@code getNext} calls before declaring the browse done
+     * @param selector      optional JMS-style selector expression (may be null)
+     * @return a list of browsed messages (never null, may be empty)
+     * @throws JCSMPException if browser creation fails
+     */
+    public List<BytesXMLMessage> browseQueue(String queueName, int maxMessages, long timeoutMillis,
+                                             String selector) throws JCSMPException {
+        Queue queue = JCSMPFactory.onlyInstance().createQueue(queueName);
+
+        BrowserProperties browserProps = new BrowserProperties();
+        browserProps.setEndpoint(queue);
+        if (selector != null && !selector.isEmpty()) {
+            browserProps.setSelector(selector);
+        }
+
+        Browser browser = null;
+        List<BytesXMLMessage> messages = new ArrayList<>();
+        try {
+            browser = session.createBrowser(browserProps);
+            // getNext blocks up to timeoutMillis. A null return means "nothing more right now",
+            // which is the natural stop condition for a one-shot browse — keep simple.
+            int browseTimeoutInt = (int) Math.min(timeoutMillis, Integer.MAX_VALUE);
+            for (int i = 0; i < maxMessages; i++) {
+                BytesXMLMessage msg = browser.getNext(browseTimeoutInt);
+                if (msg == null) {
+                    break;
+                }
+                messages.add(msg);
+            }
+            return messages;
+        } finally {
+            if (browser != null) {
+                browser.close();
+            }
+        }
+    }
+
+    /**
+     * Issues a Solace Cache request for a topic pattern. Adds a transient subscription on
+     * the session, sends a blocking cache request to the named cache instance, then drains
+     * any cached messages that arrived on the session's sync consumer. The subscription is
+     * removed before returning.
+     *
+     * <p><b>Prerequisites — this operation only works when the broker side is set up:</b></p>
+     * <ul>
+     *   <li>A PubSub+ Cache Instance is deployed and running, and joined to the Message VPN.</li>
+     *   <li>The cache instance is configured to cache the requested topic pattern (cache
+     *       instances cache only topics they have been subscribed to administratively).</li>
+     *   <li>The cache instance name passed here matches the broker's cache instance name.</li>
+     *   <li>The connecting client has authorization to issue cache requests on the VPN.</li>
+     * </ul>
+     * <p>If any of these is missing, the broker returns an error and this call throws —
+     * the connector cannot detect the misconfiguration ahead of time.</p>
+     *
+     * @param cacheName        the cache-instance name configured on the broker
+     * @param topicPattern     the topic (or wildcard pattern) to request cached messages for
+     * @param maxMessages      max messages to request from cache (0 = unlimited per Solace)
+     * @param maxAgeSeconds    max age of cached messages in seconds (0 = any age)
+     * @param requestTimeoutMs how long the cache request itself may take
+     * @param liveDataAction   one of FULFILL, FLOW_THRU, QUEUE — controls how live messages
+     *                         on the same topic interleave with the cached delivery
+     * @param drainTimeoutMs   how long to keep draining the consumer for cached messages
+     *                         after the cache request returns. Cached messages can arrive
+     *                         asynchronously on the session consumer; this is the wait window
+     * @return list of received cached messages
+     * @throws JCSMPException if cache session creation, subscription, or request fails
+     */
+    public List<BytesXMLMessage> requestCachedMessages(String cacheName, String topicPattern,
+                                                       long maxMessages, int maxAgeSeconds,
+                                                       long requestTimeoutMs, String liveDataAction,
+                                                       long drainTimeoutMs) throws JCSMPException {
+
+        Topic topic = JCSMPFactory.onlyInstance().createTopic(topicPattern);
+        CacheLiveDataAction action = resolveLiveDataAction(liveDataAction);
+
+        // CacheSessionProperties has no no-arg constructor; use the 4-arg form
+        // (name, maxMsgs, maxAge, timeout). Timeout is per-cache-request in ms.
+        CacheSessionProperties cacheProps = new CacheSessionProperties(
+                cacheName,
+                (int) Math.min(maxMessages, Integer.MAX_VALUE),
+                maxAgeSeconds,
+                (int) Math.min(requestTimeoutMs, Integer.MAX_VALUE));
+
+        CacheSession cacheSession = session.createCacheSession(cacheProps);
+        List<BytesXMLMessage> collected = new ArrayList<>();
+        boolean subscribed = false;
+        try {
+            // Subscribe so cached messages route to the session consumer that we drain below.
+            session.addSubscription(topic);
+            subscribed = true;
+
+            // Blocking cache request — returns when broker finishes streaming cached msgs
+            // or the request times out.
+            CacheRequestResult result = cacheSession.sendCacheRequest(
+                    Long.valueOf(System.nanoTime()), topic, true, action);
+            if (log.isDebugEnabled()) {
+                log.debug("Cache request to '" + cacheName + "' for topic '" + topicPattern
+                        + "' returned: " + result);
+            }
+
+            // Cached messages flow to the session consumer asynchronously. Drain it for the
+            // configured window — receive(timeout) returns null when no message is ready.
+            long deadline = System.currentTimeMillis() + drainTimeoutMs;
+            while (System.currentTimeMillis() < deadline) {
+                long remaining = deadline - System.currentTimeMillis();
+                if (remaining <= 0) {
+                    break;
+                }
+                BytesXMLMessage msg = consumer.receive((int) Math.min(remaining, 500));
+                if (msg == null) {
+                    // A null after some collected messages typically means cache delivery is done;
+                    // break to avoid burning the full drain window when there's nothing left.
+                    if (!collected.isEmpty()) {
+                        break;
+                    }
+                    continue;
+                }
+                collected.add(msg);
+                if (maxMessages > 0 && collected.size() >= maxMessages) {
+                    break;
+                }
+            }
+            return collected;
+        } finally {
+            if (subscribed) {
+                try {
+                    session.removeSubscription(topic);
+                } catch (JCSMPException e) {
+                    log.warn("Failed to remove transient cache subscription for topic '"
+                            + topicPattern + "': " + e.getMessage());
+                }
+            }
+            try {
+                cacheSession.close();
+            } catch (Exception ignored) {
+                // CacheSession.close is best-effort cleanup
+            }
+        }
+    }
+
+    private CacheLiveDataAction resolveLiveDataAction(String value) {
+        if (value == null) {
+            return CacheLiveDataAction.FULFILL;
+        }
+        switch (value.toUpperCase()) {
+            case SolaceConstants.CACHE_LIVE_DATA_FLOW_THRU:
+                return CacheLiveDataAction.FLOW_THRU;
+            case SolaceConstants.CACHE_LIVE_DATA_QUEUE:
+                return CacheLiveDataAction.QUEUE;
+            case SolaceConstants.CACHE_LIVE_DATA_FULFILL:
+            default:
+                return CacheLiveDataAction.FULFILL;
         }
     }
 

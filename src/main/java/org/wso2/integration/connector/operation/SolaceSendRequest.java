@@ -1,7 +1,21 @@
 /*
- * Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com)
- * Licensed under the Apache License, Version 2.0
+ * Copyright (c) 2026, WSO2 LLC. (http://www.wso2.org).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
+
 package org.wso2.integration.connector.operation;
 
 import com.solacesystems.jcsmp.BytesMessage;
@@ -10,19 +24,15 @@ import com.solacesystems.jcsmp.JCSMPException;
 import com.solacesystems.jcsmp.JCSMPRequestTimeoutException;
 import com.solacesystems.jcsmp.TextMessage;
 import com.solacesystems.jcsmp.XMLContentMessage;
-import org.apache.axiom.om.OMElement;
-import org.apache.axis2.Constants;
-import org.apache.axis2.builder.BuilderUtil;
-import org.apache.axis2.builder.Builder;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.synapse.MessageContext;
-import org.apache.synapse.core.axis2.Axis2MessageContext;
+import org.json.JSONObject;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import org.wso2.integration.connector.connection.SolaceConnection;
 import org.wso2.integration.connector.constants.SolaceConstants;
 import org.wso2.integration.connector.core.AbstractConnectorOperation;
@@ -109,8 +119,6 @@ public class SolaceSendRequest extends AbstractConnectorOperation {
             String[] payloadAndType = SolaceUtils.extractPayloadAndContentType(messageContext);
             String payload = payloadAndType[0];
             String httpContentType = payloadAndType[1];
-            org.apache.axis2.context.MessageContext axis2Mc =
-                    ((Axis2MessageContext) messageContext).getAxis2MessageContext();
 
             // Build optional message properties
             SolaceMessageProperties msgProperties = SolaceUtils.buildMessageProperties(messageContext);
@@ -139,7 +147,7 @@ public class SolaceSendRequest extends AbstractConnectorOperation {
                 contentType = inferContentType(response);
             }
 
-            // Set response properties in message context
+            // Legacy solace.* context properties — kept for callers that read them directly.
             messageContext.setProperty(SolaceConstants.SOLACE_DESTINATION, destinationName);
             messageContext.setProperty(SolaceConstants.SOLACE_DELIVERY_MODE, deliveryMode);
             if (response.getCorrelationId() != null) {
@@ -161,18 +169,33 @@ public class SolaceSendRequest extends AbstractConnectorOperation {
                         response.getReceiveTimestamp());
             }
 
-            // Use BuilderUtil to properly build the response based on content type
-            axis2Mc.setProperty(Constants.Configuration.MESSAGE_TYPE, contentType);
-            axis2Mc.setProperty(Constants.Configuration.CONTENT_TYPE, contentType);
-
-            InputStream inputStream = new ByteArrayInputStream(responseBytes);
-            Builder builder = BuilderUtil.getBuilderFromSelector(contentType, axis2Mc);
-            OMElement documentElement = builder.processDocument(inputStream, contentType, axis2Mc);
-
-            if (messageContext.getEnvelope().getBody().getFirstElement() != null) {
-                messageContext.getEnvelope().getBody().getFirstElement().detach();
+            // Build attributes (the metadata) and the payload (the reply content) and route
+            // both through handleConnectorResponse so ${vars.X.payload} works and the
+            // overwriteBody flag is honored consistently with other framework operations.
+            Map<String, Object> attributes = new HashMap<>();
+            attributes.put("destination", destinationName);
+            attributes.put("destinationType", destinationType);
+            attributes.put("deliveryMode", deliveryMode);
+            attributes.put("contentType", contentType);
+            if (response.getCorrelationId() != null) {
+                attributes.put("correlationId", response.getCorrelationId());
             }
-            messageContext.getEnvelope().getBody().addChild(documentElement);
+            if (response.getApplicationMessageId() != null) {
+                attributes.put("applicationMessageId", response.getApplicationMessageId());
+            }
+            if (response.getApplicationMessageType() != null) {
+                attributes.put("applicationMessageType", response.getApplicationMessageType());
+            }
+            if (response.getReceiveTimestamp() > 0) {
+                attributes.put("receiveTimestamp", response.getReceiveTimestamp());
+            }
+
+            String body = new String(responseBytes, StandardCharsets.UTF_8);
+            String payloadJson = looksLikeJson(body) ? body : JSONObject.quote(body);
+            log.info("response: "+ payloadJson + " responseVariable: " + responseVariable 
+            + " overwriteBody: " + overwriteBody + "Attributes: " + attributes.toString());
+            handleConnectorResponse(messageContext, responseVariable, overwriteBody,
+                    payloadJson, null, attributes);
 
             if (log.isDebugEnabled()) {
                 log.debug("Response received successfully for request to " + destinationName);
@@ -187,6 +210,12 @@ public class SolaceSendRequest extends AbstractConnectorOperation {
                 handler.returnConnection(SolaceConstants.CONNECTOR_NAME, connectionName, connection);
             }
         }
+    }
+
+    private boolean looksLikeJson(String s) {
+        if (s == null || s.isEmpty()) return false;
+        String t = s.trim();
+        return t.startsWith("{") || t.startsWith("[");
     }
 
     private byte[] extractRawPayload(BytesXMLMessage message) {

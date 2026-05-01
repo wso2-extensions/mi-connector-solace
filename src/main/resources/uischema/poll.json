@@ -1,0 +1,91 @@
+{
+  "connectorName": "solace",
+  "operationName": "poll",
+  "title": "Poll Message",
+  "help": "Synchronously polls a single message from a Solace queue. Returns null on timeout. SETTLEMENT — outside a transaction, the message is acked on receipt; if mediation fails afterwards the message is lost (at-most-once). Inside beginTransaction / commit, settlement is deferred — commit acks the message, rollback redelivers it (at-least-once). Wrap poll in a transaction whenever mediation failure should redeliver instead of lose. Manual ack/nack of polled messages is not supported.",
+  "elements": [
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "General",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "configRef",
+              "displayName": "Connection",
+              "inputType": "connection",
+              "allowedConnectionTypes": ["solace"],
+              "defaultType": "connection.solace",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "The connection to use for the operation."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "queueName",
+              "displayName": "Queue Name",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "Name of the queue to poll."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "pollTimeout",
+              "displayName": "Poll Timeout (ms)",
+              "inputType": "stringOrExpression",
+              "defaultValue": "5000",
+              "required": "false",
+              "helpTip": "Maximum time to wait for a message in milliseconds. Default: 5000."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Advanced",
+        "isCollapsed": true,
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "selector",
+              "displayName": "Selector",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "required": "false",
+              "helpTip": "Optional JMS-style selector expression for filtering (e.g., region = 'EU' AND priority > 5). Leave blank to match any message."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "responseVariable",
+              "displayName": "Response Variable",
+              "inputType": "stringOrExpression",
+              "defaultValue": "solacePollResponse",
+              "helpTip": "Property name where the result JSON is stored. Contains: destination, received, timedOut, messageId, correlationId, payload, contentType."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "overwriteBody",
+              "displayName": "Overwrite Body",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "helpTip": "Replace the message body in Message Context with the polled message's payload."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

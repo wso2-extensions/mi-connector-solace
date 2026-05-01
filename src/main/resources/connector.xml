@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright (c) 2025, WSO2 LLC. (http://www.wso2.org).
+  ~ Copyright (c) 2026, WSO2 LLC. (http://www.wso2.org).
   ~
   ~ WSO2 LLC. licenses this file to you under the Apache License,
   ~ Version 2.0 (the "License"); you may not use this file except
@@ -21,6 +21,7 @@
         <dependency component="config" />
         <dependency component="async" />
         <dependency component="sync" />
+        <dependency component="consume" />
         <dependency component="transactional" />
         <description>WSO2 solace connector library</description>
     </component>

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2025, WSO2 LLC. (http://www.wso2.org).
+ * Copyright (c) 2026, WSO2 LLC. (http://www.wso2.org).
  *
  * WSO2 LLC. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -18,8 +18,13 @@
 
 package org.wso2.integration.connector.utils;
 
+import com.solacesystems.jcsmp.BytesXMLMessage;
+import com.solacesystems.jcsmp.Destination;
 import com.solacesystems.jcsmp.JCSMPChannelProperties;
 import com.solacesystems.jcsmp.JCSMPProperties;
+import com.solacesystems.jcsmp.Queue;
+import com.solacesystems.jcsmp.SDTException;
+import com.solacesystems.jcsmp.SDTMap;
 
 import org.apache.axiom.om.OMElement;
 import org.apache.commons.lang.StringUtils;
@@ -250,6 +255,114 @@ public final class SolaceUtils {
         }
 
         return hasProperties ? properties : null;
+    }
+
+    /**
+     * Populates {@code sink} with the standard SMF headers from a received message
+     * (poll/browse/sendRequest reply/inbound). Null/zero/default fields are skipped so
+     * the response variable stays uncluttered. User properties (the SDTMap set by the
+     * publisher via {@code <userProperties>}) are placed under the {@code userProperties}
+     * key as a nested map. Pre-existing keys in {@code sink} (e.g. a destination name
+     * the caller already filled in) are not overwritten.
+     */
+    public static void populateMessageMetadata(BytesXMLMessage message, Map<String, Object> sink) {
+        if (message == null || sink == null) {
+            return;
+        }
+        putIfAbsentNotNull(sink, "messageId", message.getMessageId());
+        putIfAbsentNotNull(sink, "correlationId", message.getCorrelationId());
+        putIfAbsentNotNull(sink, "applicationMessageId", message.getApplicationMessageId());
+        putIfAbsentNotNull(sink, "applicationMessageType", message.getApplicationMessageType());
+        putIfAbsentNotNull(sink, "senderId", message.getSenderId());
+        if (message.getDeliveryMode() != null) {
+            sink.putIfAbsent("deliveryMode", message.getDeliveryMode().name());
+        }
+        sink.putIfAbsent("priority", message.getPriority());
+        sink.putIfAbsent("redelivered", message.getRedelivered());
+        sink.putIfAbsent("dmqEligible", message.isDMQEligible());
+        sink.putIfAbsent("elidingEligible", message.isElidingEligible());
+
+        long expiration = message.getExpiration();
+        if (expiration != 0L) {
+            sink.putIfAbsent("expiration", expiration);
+        }
+        long timeToLive = message.getTimeToLive();
+        if (timeToLive != 0L) {
+            sink.putIfAbsent("timeToLive", timeToLive);
+        }
+        Long sendTs = message.getSenderTimestamp();
+        if (sendTs != null) {
+            sink.putIfAbsent("senderTimestamp", sendTs);
+        }
+        long receiveTs = message.getReceiveTimestamp();
+        if (receiveTs != 0L) {
+            sink.putIfAbsent("receiveTimestamp", receiveTs);
+        }
+        Long seqNum = message.getSequenceNumber();
+        if (seqNum != null) {
+            sink.putIfAbsent("sequenceNumber", seqNum);
+        }
+
+        Destination replyTo = message.getReplyTo();
+        if (replyTo != null && !sink.containsKey("replyTo")) {
+            Map<String, Object> replyToMap = new HashMap<>();
+            replyToMap.put("name", replyTo.getName());
+            replyToMap.put("type", replyTo instanceof Queue
+                    ? SolaceConstants.DESTINATION_TYPE_QUEUE
+                    : SolaceConstants.DESTINATION_TYPE_TOPIC);
+            sink.put("replyTo", replyToMap);
+        }
+
+        Map<String, Object> userProps = extractUserProperties(message);
+        log.info("UserPropeties:" + userProps.toString());
+        if (userProps != null && !userProps.isEmpty() && !sink.containsKey("userProperties")) {
+            sink.put("userProperties", userProps);
+        }
+    }
+
+    /**
+     * Reads the SDTMap of user properties (publisher-supplied {@code <userProperties>})
+     * off a received message and converts it to a plain {@code Map<String, Object>} so
+     * Synapse expressions can drill into it via {@code ${vars.X.attributes.userProperties.key}}.
+     * Returns {@code null} if the message carries no user properties; primitive SDT values
+     * (string/int/long/double/bool/byte[]) round-trip naturally; nested SDT containers fall
+     * back to {@code toString()} so the field is at least readable.
+     */
+    public static Map<String, Object> extractUserProperties(BytesXMLMessage message) {
+        if (message == null) {
+            return null;
+        }
+        SDTMap props = message.getProperties();
+        if (props == null || props.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> out = new HashMap<>();
+        for (String key : props.keySet()) {
+            try {
+                Object value = props.get(key);
+                if (value == null
+                        || value instanceof String
+                        || value instanceof Number
+                        || value instanceof Boolean) {
+                    out.put(key, value);
+                } else if (value instanceof byte[]) {
+                    out.put(key, java.util.Base64.getEncoder().encodeToString((byte[]) value));
+                } else {
+                    out.put(key, value.toString());
+                }
+            } catch (SDTException e) {
+                if (log.isDebugEnabled()) {
+                    log.debug("Failed to read user property '" + key + "'", e);
+                }
+            }
+        }
+        return out;
+    }
+
+    private static void putIfAbsentNotNull(Map<String, Object> sink, String key, Object value) {
+        if (value != null) {
+            sink.putIfAbsent(key, value);
+        }
     }
 
     /**
