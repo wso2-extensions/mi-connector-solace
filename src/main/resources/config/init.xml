@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2026, WSO2 LLC. (http://www.wso2.org).
+  ~
+  ~ WSO2 LLC. licenses this file to you under the Apache License,
+  ~ Version 2.0 (the "License"); you may not use this file except
+  ~ in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~ http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing,
+  ~ software distributed under the License is distributed on an
+  ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  ~ KIND, either express or implied. See the License for the
+  ~ specific language governing permissions and limitations
+  ~ under the License.
+  -->
+<template name="init" xmlns="http://ws.apache.org/ns/synapse">
+    <parameter name="name" description="Unique name for this Solace connection."/>
+    <parameter name="host" description="Host URL of the Solace broker (e.g., tcp://localhost:55555)."/>
+    <parameter name="vpnName" description="Message VPN name (default: 'default')."/>
+    <parameter name="username" description="Client username for authentication."/>
+    <parameter name="password" description="Client password for authentication."/>
+    <parameter name="clientName" description="Client name for the session."/>
+    <parameter name="connectionTimeout" description="Connection timeout in milliseconds."/>
+    <parameter name="readTimeout" description="Read timeout in milliseconds."/>
+    <parameter name="compressionLevel" description="Compression level (0-9). 0 disables compression."/>
+    <parameter name="generateSendTimestamps" description="Whether to generate send timestamps (true/false)."/>
+    <parameter name="generateReceiveTimestamps" description="Whether to generate receive timestamps (true/false)."/>
+    <parameter name="generateSequenceNumbers" description="Whether to generate sequence numbers (true/false)."/>
+    <parameter name="calculateMessageExpiration" description="Whether to calculate message expiration (true/false)."/>
+    <parameter name="connectRetries" description="Number of connection retries."/>
+    <parameter name="connectRetriesPerHost" description="Number of connection retries per host."/>
+    <parameter name="reconnectRetries" description="Number of reconnection retries."/>
+    <parameter name="reconnectRetryWait" description="Wait time between reconnection retries in milliseconds."/>
+    <parameter name="sslTrustStorePath" description="Path to the SSL trust store file."/>
+    <parameter name="sslTrustStorePassword" description="Password for the SSL trust store."/>
+    <parameter name="sslTrustStoreFormat" description="Format of the SSL trust store (e.g., JKS, PKCS12)."/>
+    <parameter name="sslKeyStorePath" description="Path to the SSL key store file."/>
+    <parameter name="sslKeyStorePassword" description="Password for the SSL key store."/>
+    <parameter name="sslKeyStoreFormat" description="Format of the SSL key store (e.g., JKS, PKCS12)."/>
+    <parameter name="sslKeyPassword" description="Password for the SSL private key."/>
+    <parameter name="sslValidateCertificate" description="Whether to validate the server certificate (true/false)."/>
+    <parameter name="sslValidateCertificateDate" description="Whether to validate the certificate date (true/false)."/>
+    <parameter name="sslValidateHostname" description="Whether to validate the server hostname against the certificate (true/false)."/>
+    <parameter name="authenticationScheme" description="Authentication scheme: BASIC | CLIENT_CERTIFICATE | OAUTH2. Default: BASIC."/>
+    <parameter name="oauth2AccessToken" description="OAuth2 access token (used when authenticationScheme == OAUTH2)."/>
+    <parameter name="oauth2IssuerIdentifier" description="OAuth2 issuer identifier (optional, used when authenticationScheme == OAUTH2)."/>
+    <parameter name="oidcIdToken" description="OIDC ID token (optional, used when authenticationScheme == OAUTH2)."/>
+    <parameter name="pubAckWindowSize" description="Publisher acknowledgement window size for guaranteed messaging (default: 1)."/>
+    <sequence>
+      <property expression="$func:name" name="name"/>
+      <property expression="$func:host" name="host"/>
+      <property expression="$func:vpnName" name="vpnName"/>
+      <property expression="$func:username" name="username"/>
+      <property expression="$func:apiProvidedUsername" name="apiProvidedUsername"/>
+      <property expression="$func:password" name="password"/>
+      <property expression="$func:clientName" name="clientName"/>
+      <property expression="$func:connectionTimeout" name="connectionTimeout"/>
+      <property expression="$func:readTimeout" name="readTimeout"/>
+      <property expression="$func:compressionLevel" name="compressionLevel"/>
+      <property expression="$func:generateSendTimestamps" name="generateSendTimestamps"/>
+      <property expression="$func:generateReceiveTimestamps" name="generateReceiveTimestamps"/>
+      <property expression="$func:generateSequenceNumbers" name="generateSequenceNumbers"/>
+      <property expression="$func:calculateMessageExpiration" name="calculateMessageExpiration"/>
+      <property expression="$func:connectRetries" name="connectRetries"/>
+      <property expression="$func:connectRetriesPerHost" name="connectRetriesPerHost"/>
+      <property expression="$func:reconnectRetries" name="reconnectRetries"/>
+      <property expression="$func:reconnectRetryWait" name="reconnectRetryWait"/>
+      <property expression="$func:sslTrustStorePath" name="sslTrustStorePath"/>
+      <property expression="$func:sslTrustStorePassword" name="sslTrustStorePassword"/>
+      <property expression="$func:sslTrustStoreFormat" name="sslTrustStoreFormat"/>
+      <property expression="$func:sslKeyStorePath" name="sslKeyStorePath"/>
+      <property expression="$func:sslKeyStorePassword" name="sslKeyStorePassword"/>
+      <property expression="$func:sslKeyStoreFormat" name="sslKeyStoreFormat"/>
+      <property expression="$func:sslKeyPassword" name="sslKeyPassword"/>
+      <property expression="$func:sslValidateCertificate" name="sslValidateCertificate"/>
+      <property expression="$func:sslValidateCertificateDate" name="sslValidateCertificateDate"/>
+      <property expression="$func:sslValidateHostname" name="sslValidateHostname"/>
+      <property expression="$func:authenticationScheme" name="authenticationScheme"/>
+      <property expression="$func:oauth2AccessToken" name="oauth2AccessToken"/>
+      <property expression="$func:oauth2IssuerIdentifier" name="oauth2IssuerIdentifier"/>
+      <property expression="$func:oidcIdToken" name="oidcIdToken"/>
+      <property expression="$func:pubAckWindowSize" name="pubAckWindowSize"/>
+      <class name="org.wso2.integration.connector.connection.SolaceConfigConnector"/>
+    </sequence>
+</template>

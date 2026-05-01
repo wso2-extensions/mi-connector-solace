@@ -1,0 +1,309 @@
+{
+  "connectorName": "solace",
+  "operationName": "publishMessage",
+  "title": "Publish Message",
+  "help": "Configuration properties for Publish Message operation",
+  "elements": [
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "General",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "configRef",
+              "displayName": "Connection",
+              "inputType": "connection",
+              "allowedConnectionTypes": ["solace"],
+              "defaultType": "connection.solace",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "The connection to use for the operation."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "destinationType",
+              "displayName": "Destination Type",
+              "inputType": "combo",
+              "defaultValue": "TOPIC",
+              "required": "true",
+              "comboValues": [
+                "TOPIC",
+                "QUEUE"
+              ],
+              "helpTip": "Destination type: TOPIC or QUEUE."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "destinationName",
+              "displayName": "Destination Name",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "required": "true",
+              "helpTip": "Name of the topic or queue to publish to."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "messageType",
+              "displayName": "Message Type",
+              "inputType": "combo",
+              "defaultValue": "TEXT",
+              "required": "false",
+              "comboValues": [
+                "TEXT",
+                "BYTES",
+                "XML"
+              ],
+              "helpTip": "Message type: TEXT, BYTES, or XML. JSON payloads are auto-detected and carried as TEXT."
+            }
+          }  
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Advanced",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "deliveryMode",
+              "displayName": "Delivery Mode",
+              "inputType": "combo",
+              "defaultValue": "DIRECT",
+              "comboValues": [
+                "DIRECT",
+                "PERSISTENT",
+                "NON_PERSISTENT"
+              ],
+              "helpTip": "Delivery mode. DIRECT is valid only for TOPIC destinations (best-effort pub/sub). QUEUE destinations require PERSISTENT or NON_PERSISTENT (guaranteed delivery)."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "correlationId",
+              "displayName": "Correlation ID",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "helpTip": "Optional trace ID echoed by any consumer that replies. Useful for log correlation across services."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "priority",
+              "displayName": "Priority",
+              "inputType": "stringOrExpression",
+              "defaultValue": "0",
+              "helpTip": "Message priority (0-255)."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "timeToLive",
+              "displayName": "Time To Live",
+              "inputType": "stringOrExpression",
+              "defaultValue": "0",
+              "helpTip": "Time to live in milliseconds."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "applicationMessageId",
+              "displayName": "Application Message ID",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "helpTip": "Application-defined message ID."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "applicationMessageType",
+              "displayName": "Application Message Type",
+              "inputType": "stringOrExpression",
+              "defaultValue": "",
+              "helpTip": "Application-defined message type."
+            }
+          },
+          {
+            "type": "attributeGroup",
+            "value": {
+              "groupName": "Asynchronous Reply-To (optional)",
+              "isCollapsed": true,
+              "elements": [
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "replyToDestinationType",
+                    "displayName": "Reply-To Destination Type",
+                    "inputType": "combo",
+                    "defaultValue": "QUEUE",
+                    "comboValues": [
+                      "TOPIC",
+                      "QUEUE"
+                    ],
+                    "helpTip": "Destination type where consumers should send their reply: TOPIC or QUEUE. Leave blank for fire-and-forget messages."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "replyToDestinationName",
+                    "displayName": "Reply-To Destination Name",
+                    "inputType": "stringOrExpression",
+                    "defaultValue": "",
+                    "helpTip": "Pre-existing destination name where replies should arrive. You must run a separate inbound endpoint to consume from it. For synchronous request-reply, use the Send Request operation instead."
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "table",
+            "value": {
+              "name": "userProperties",
+              "displayName": "User Properties",
+              "description": "Key value pairs for user properties (for content-based routing and filtering)",
+              "tableKey": "propertyName",
+              "tableValue": "propertyValue",
+              "elements": [
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "propertyName",
+                    "displayName": "Name",
+                    "inputType": "string",
+                    "required": false,
+                    "helpTip": ""
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "propertyValue",
+                    "displayName": "Value",
+                    "inputType": "stringOrExpression",
+                    "required": false,
+                    "helpTip": ""
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "dmqEligible",
+              "displayName": "DMQ Eligible",
+              "inputType": "boolean",
+              "defaultValue": true,
+              "helpTip": "Whether the message is eligible for the Dead Message Queue if it cannot be delivered."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "elidingEligible",
+              "displayName": "Eliding Eligible",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "helpTip": "Whether the message is eligible for eliding. When enabled, the broker may discard intermediate messages on a topic to reduce load."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "waitForAck",
+              "displayName": "Wait For Ack",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "helpTip": "If true, block for the broker ACK before returning. Ack outcome is exposed via the 'solace.ack.status' property (ACK | NACK | TIMEOUT). Only applies to PERSISTENT and NON_PERSISTENT delivery modes.",
+              "enableCondition": [
+                "NOT",
+                {
+                  "deliveryMode": "DIRECT"
+                }
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "ackTimeout",
+              "displayName": "Ack Timeout",
+              "inputType": "stringOrExpression",
+              "defaultValue": "10000",
+              "helpTip": "Maximum time in milliseconds to wait for the broker ACK when Wait For Ack is enabled.",
+              "enableCondition": [
+                "AND",
+                {
+                  "waitForAck": "true"
+                },
+                [
+                  "NOT",
+                  {
+                    "deliveryMode": "DIRECT"
+                  }
+                ]
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "continueOnAckFailure",
+              "displayName": "Continue On Ack Failure",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "helpTip": "When enabled, a NACK or ACK timeout will not throw. Inspect the 'solace.ack.status' property (ACK | NACK | TIMEOUT) to branch the flow. When disabled (default), failures throw and go to the fault sequence.",
+              "enableCondition": [
+                "AND",
+                {
+                  "waitForAck": "true"
+                },
+                [
+                  "NOT",
+                  {
+                    "deliveryMode": "DIRECT"
+                  }
+                ]
+              ]
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "responseVariable",
+              "displayName": "Response Variable",
+              "inputType": "stringOrExpression",
+              "defaultValue": "solacePublishResponse",
+              "helpTip": "Property name where the publish result JSON is stored. Contains: destination, destinationType, deliveryMode, messageType, ackStatus, ackReceived, correlationKey, error, publishedAt."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "overwriteBody",
+              "displayName": "Overwrite Body",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "helpTip": "Replace the Message Body in Message Context with the response of the operation."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

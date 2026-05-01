@@ -1,0 +1,55 @@
+{
+  "connectorName": "solace",
+  "operationName": "acknowledgeMessage",
+  "title": "Acknowledge Message",
+  "help": "Acknowledge a message received by the inbound endpoint so the broker can remove it from the queue. Requires the inbound endpoint to be configured with solace.autoAck=false.",
+  "elements": [
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "General",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "description",
+              "displayName": "Description",
+              "inputType": "string",
+              "defaultValue": "",
+              "helpTip": "Description of the operation."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Advanced",
+        "isCollapsed": true,
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "responseVariable",
+              "displayName": "Response Variable",
+              "inputType": "stringOrExpression",
+              "defaultValue": "solaceAckResponse",
+              "helpTip": "Property name where the operation result is stored."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "overwriteBody",
+              "displayName": "Overwrite Body",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "helpTip": "Replace the Message Body in Message Context with the response of the operation."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

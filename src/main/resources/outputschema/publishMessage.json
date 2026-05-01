@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Output Schema for Publish Message Operation",
+  "description": "Output schema for the Solace publishMessage operation.",
+  "properties": {
+    "payload": {
+      "type": "object",
+      "description": "The main response payload from the publishMessage operation.",
+      "properties": {
+        "messageId": {
+          "description": "The unique identifier for the published message."
+        },
+        "status": {
+          "description": "Status of the publish operation (e.g., SUCCESS, ERROR)."
+        },
+        "details": {
+          "description": "Additional details about the publish operation."
+        }
+      }
+    }
+  },
+  "required": ["payload"],
+  "additionalProperties": false
+}

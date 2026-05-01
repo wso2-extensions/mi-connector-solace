@@ -1,0 +1,55 @@
+{
+  "connectorName": "solace",
+  "operationName": "rollback",
+  "title": "Rollback Transaction",
+  "help": "Rolls back the current local transaction on the Solace connection. Subsequent solace.publishMessage calls will not be committed. Use this to undo changes made during the transaction.",
+  "elements": [
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "General",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "description",
+              "displayName": "Description",
+              "inputType": "string",
+              "defaultValue": "",
+              "helpTip": "Description of the operation."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Advanced",
+        "isCollapsed": true,
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "responseVariable",
+              "displayName": "Response Variable",
+              "inputType": "stringOrExpression",
+              "defaultValue": "solaceResponse",
+              "helpTip": "Property name where the operation result is stored."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "overwriteBody",
+              "displayName": "Overwrite Body",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "helpTip": "Replace the Message Body in Message Context with the response of the operation."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

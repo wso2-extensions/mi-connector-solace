@@ -1,0 +1,321 @@
+{
+    "name": "Solace",
+    "owner": "WSO2",
+    "product": "MI",
+    "category": "Developer Tools",
+    "documentationUrl": "",
+    "mavenGroupId": "org.wso2.integration.connector",
+    "mavenArtifactId": "mi-connector-solace",
+    "description": "The Solace connector enables WSO2 Micro Integrator (MI) to publish messages and interact with Solace PubSub+ brokers. It supports reliable, asynchronous communication, allowing you to send messages to topics or queues, use request/reply patterns, and manage acknowledgments.",
+    "status": "Active",
+    "rank": 50,
+    "type": "Connector",
+    "labels": [
+        "integration",
+        "messaging",
+        "solace"
+    ],
+    "releases": [
+        {
+            "tagName": "v1.0.0",
+            "products": [
+                "MI 4.6.0"
+            ],
+            "operations": [
+                {
+                    "name": "publishMessage",
+                    "description": "Publish a message to a Solace topic or queue.",
+                    "params": [
+                        { "name": "configRef", "type": "connection", "required": true, "description": "The connection to use for the operation." },
+                        { "name": "destinationType", "type": "combo", "required": true, "description": "Destination type: TOPIC or QUEUE." },
+                        { "name": "destinationName", "type": "stringOrExpression", "required": true, "description": "Name of the topic or queue to publish to." },
+                        { "name": "messageType", "type": "combo", "required": false, "description": "Message type: TEXT, XML, BYTES, MAP, STREAM." },
+                        { "name": "payload", "type": "stringOrExpression", "required": true, "description": "Message payload." }
+                    ],
+                    "isHidden": false
+                },
+                {
+                    "name": "sendRequest",
+                    "description": "Send a request message and wait for a response.",
+                    "params": [
+                        { "name": "configRef", "type": "connection", "required": true, "description": "The connection to use for the operation." },
+                        { "name": "destinationType", "type": "combo", "required": true, "description": "Destination type: TOPIC or QUEUE." },
+                        { "name": "destinationName", "type": "stringOrExpression", "required": true, "description": "Name of the topic or queue to send the request to." },
+                        { "name": "payload", "type": "stringOrExpression", "required": true, "description": "Request payload." },
+                        { "name": "requestTimeout", "type": "stringOrExpression", "required": false, "description": "Maximum time to wait for response in milliseconds." }
+                    ],
+                    "isHidden": false
+                },
+                {
+                    "name": "acknowledgeMessage",
+                    "description": "Acknowledge a message received by the inbound endpoint.",
+                    "params": [
+                        { "name": "configRef", "type": "connection", "required": true, "description": "The connection to use for the operation." },
+                        { "name": "responseVariable", "type": "stringOrExpression", "required": false, "description": "The name of the variable to which the output should be stored." },
+                        { "name": "overwriteBody", "type": "boolean", "required": false, "description": "Replace the Message Body in Message Context with the response." }
+                    ],
+                    "isHidden": false
+                },
+                {
+                    "name": "sendReply",
+                    "description": "Send a reply to an inbound request message using the reply-to destination from the message context.",
+                    "params": [
+                        { "name": "configRef", "type": "connection", "required": true, "description": "The connection to use for the operation." },
+                        { "name": "responseVariable", "type": "stringOrExpression", "required": false, "description": "The name of the variable to which the output should be stored." },
+                        { "name": "overwriteBody", "type": "boolean", "required": false, "description": "Replace the Message Body in Message Context with the response." }
+                    ],
+                    "isHidden": false
+                },
+                {
+                    "name": "nackMessage",
+                    "description": "Negatively acknowledge a received message.",
+                    "params": [
+                        { "name": "configRef", "type": "connection", "required": true, "description": "The connection to use for the operation." },
+                        { "name": "responseVariable", "type": "stringOrExpression", "required": false, "description": "The name of the variable to which the output should be stored." },
+                        { "name": "overwriteBody", "type": "boolean", "required": false, "description": "Replace the Message Body in Message Context with the response." }
+                    ],
+                    "isHidden": false
+                },
+                {
+                    "name": "accept",
+                    "description": "Accept",
+                    "params": [
+                        {
+                            "name": "responseVariable",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "",
+                            "description": "Name of the variable to which the output of the operation should be assigned"
+                        },
+                        {
+                            "name": "overwriteBody",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "false",
+                            "description": "Replace the Message Body in Message Context with the output of the operation (This will remove the payload from the above variable)."
+                        }
+                    ],
+                    "isHidden": false
+                }
+            ],
+            "connections": [
+                {
+                    "name": "solace",
+                    "description": "Solace Connection",
+                    "params": [
+                        {
+                            "name": "connectionName",
+                            "type": "string",
+                            "required": true,
+                            "defaultValue": "RABBITMQ_CONNECTION_1",
+                            "description": "The name for the rabbitmq connection"
+                        },
+                        {
+                            "name": "serverUrls",
+                            "type": "stringOrExpression",
+                            "required": true,
+                            "defaultValue": "localhost:5672",
+                            "description": "Enter RabbitMQ server URLs as a comma-separated list (e.g., host1:port1,host2:port2)."
+                        },
+                        {
+                            "name": "saslMechanism",
+                            "type": "combo",
+                            "required": true,
+                            "defaultValue": "PLAIN",
+                            "description": "Select the SASL mechanism to use for connection authentication. Supported values: PLAIN, EXTERNAL"
+                        },
+                        {
+                            "name": "oAuth2Enabled",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "false",
+                            "description": "Enable if using OAuth 2.0 (e.g., Client Credentials or Password Grant) for authentication instead of a simple username/password."
+                        },
+                        {
+                            "name": "username",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "guest",
+                            "description": "Username for PLAIN authentication."
+                        },
+                        {
+                            "name": "password",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "guest",
+                            "description": "Password for PLAIN authentication."
+                        },
+                        {
+                            "name": "tokenEndpoint",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Enter Identity Provider/Token Service token endpoint URL to generate the access token."
+                        },
+                        {
+                            "name": "grantType",
+                            "type": "combo",
+                            "required": false,
+                            "defaultValue": "client_credentials",
+                            "description": "Select the grant type to use for token generation. Supported values: client_credentials, password"
+                        },
+                        {
+                            "name": "clientId",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The client ID for token generation."
+                        },
+                        {
+                            "name": "clientSecret",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The client secret for token generation."
+                        },
+                        {
+                            "name": "oAuth2UserName",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Enter the username to use with password grant type for token generation."
+                        },
+                        {
+                            "name": "oAuth2Password",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "Enter the password to use with password grant type for token generation"
+                        },
+                        {
+                            "name": "sslEnabled",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "false",
+                            "description": "Enable SSL/TLS for the RabbitMQ connection."
+                        },
+                        {
+                            "name": "trustEverything",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "false",
+                            "description": "If enabled, all server certificates will be accepted, regardless of validity. **Not recommended for production environments.**"
+                        },
+                        {
+                            "name": "keyStoreLocation",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The file path to the Keystore containing the client's private key and certificate."
+                        },
+                        {
+                            "name": "keyStoreType",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "JKS",
+                            "description": "The type of the Keystore (e.g., JKS)."
+                        },
+                        {
+                            "name": "keyStorePassword",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The password to access the Keystore."
+                        },
+                        {
+                            "name": "trustStoreLocation",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The file path to the Truststore containing trusted server certificates."
+                        },
+                        {
+                            "name": "trustStoreType",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "JKS",
+                            "description": "The type of the Truststore (e.g., JKS)."
+                        },
+                        {
+                            "name": "trustStorePassword",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The password to access the Truststore."
+                        },
+                        {
+                            "name": "sslVersion",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "TLSv1.2",
+                            "description": "The preferred SSL/TLS protocol version (e.g., 'TLSv1.2', 'TLSv1.3')."
+                        },
+                        {
+                            "name": "hostnameVerificationEnabled",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": "false",
+                            "description": "If enabled, the hostname in the server's certificate must match the server host name you are connecting to."
+                        },
+                        {
+                            "name": "virtualHost",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The virtual host (vhost) within the RabbitMQ server to connect to. Leave blank for the default '/' vhost."
+                        },
+                        {
+                            "name": "connectionIdleTimeout",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The maximum period (in milliseconds) the connection can remain idle without any activity before it is closed by the server."
+                        },
+                        {
+                            "name": "connectionEstablishRetryCount",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The number of times to retry establishing the connection to the RabbitMQ server. Leave blank for default."
+                        },
+                        {
+                            "name": "connectionEstablishRetryInterval",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The interval (in milliseconds) between retries when establishing the connection."
+                        },
+                        {
+                            "name": "connectionRecoveryPolicyType",
+                            "type": "combo",
+                            "required": false,
+                            "defaultValue": "FIXED_WITH_INITIAL_DELAY_AND_TIMEOUT",
+                            "description": "Defines the strategy for automatic connection recovery after a disconnection. Supported values: FIXED, FIXED_WITH_INITIAL_DELAY, FIXED_WITH_INITIAL_DELAY_AND_TIMEOUT"
+                        },
+                        {
+                            "name": "connectionRecoveryInitialDelay",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The initial delay (in milliseconds) before the first recovery attempt starts."
+                        },
+                        {
+                            "name": "connectionRecoveryInterval",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The fixed interval (in milliseconds) between connection recovery retries."
+                        },
+                        {
+                            "name": "connectionRecoveryTimeout",
+                            "type": "stringOrExpression",
+                            "required": false,
+                            "defaultValue": "",
+                            "description": "The total time (in milliseconds) allowed for the connection recovery process before giving up."
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

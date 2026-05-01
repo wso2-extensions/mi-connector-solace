@@ -1,0 +1,429 @@
+{
+  "connectorName": "solace",
+  "connectionName": "solace",
+  "title": "Solace Connection",
+  "help": "Configuration properties for Solace connection",
+  "elements": [
+    {
+      "type": "attribute",
+      "value": {
+        "name": "connectionName",
+        "displayName": "Connection Name",
+        "inputType": "string",
+        "defaultValue": "solace_CONNECTION_1",
+        "required": "true",
+        "helpTip": "The name for the Solace connection.",
+        "validation": "nameWithoutSpecialCharacters"
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+          "name": "host",
+          "displayName": "Host URL",
+          "inputType": "string",
+          "defaultValue": "tcp://localhost:55555",
+          "required": "true",
+          "helpTip": "The host URL for the Solace broker (e.g., tcp://localhost:55555 or tcps://broker.example.com:55443 for SSL)."
+      }
+    },
+    {
+      "type": "attribute",
+      "value": {
+          "name": "vpnName",
+          "displayName": "VPN Name",
+          "inputType": "string",
+          "defaultValue": "default",
+          "required": "true",
+          "helpTip": "Message VPN name."
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "General",
+        "elements": [
+          {
+            "type": "attributeGroup",
+            "value": {
+              "groupName": "Authentication",
+              "elements": [
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "authenticationScheme",
+                    "displayName": "Authentication Scheme",
+                    "inputType": "combo",
+                    "comboValues": ["BASIC", "CLIENT_CERTIFICATE", "OAUTH2"],
+                    "defaultValue": "BASIC",
+                    "required": "false",
+                    "helpTip": "How the broker authenticates this connection. BASIC uses username/password (default). CLIENT_CERTIFICATE uses the configured key store as the credential — broker derives the username from the cert CN. OAUTH2 uses an access token (and optionally an OIDC ID token / issuer identifier)."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "username",
+                    "displayName": "Username",
+                    "inputType": "string",
+                    "defaultValue": "",
+                    "required": "true",
+                    "helpTip": "The username for authenticating with the Solace broker.",
+                    "enableCondition": [
+                      {"authenticationScheme": "BASIC"}
+                    ]
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "apiProvidedUsername",
+                    "displayName": "API-Provided Username",
+                    "inputType": "string",
+                    "defaultValue": "",
+                    "required": "false",
+                    "helpTip": "Optional. Used only when the Message VPN is configured with 'allow-api-provided-username'. For CLIENT_CERTIFICATE auth, leave blank to use the certificate's Common Name (default broker behavior). For OAUTH2, leave blank — identity comes from the token.",
+                    "enableCondition": [
+                      {"authenticationScheme": "CLIENT_CERTIFICATE"},
+                      {"authenticationScheme": "OAUTH2"}
+                    ]
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "password",
+                    "displayName": "Password",
+                    "inputType": "string",
+                    "defaultValue": "",
+                    "required": "true",
+                    "helpTip": "The password for authenticating with the Solace broker.",
+                    "enableCondition": [
+                      {"authenticationScheme": "BASIC"}
+                    ]
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "oauth2AccessToken",
+                    "displayName": "OAuth2 Access Token",
+                    "inputType": "string",
+                    "defaultValue": "",
+                    "required": "false",
+                    "helpTip": "OAuth2 access token used to authenticate with the broker. Provide either this, an OIDC ID token, or both. The broker validates the token against its configured OAuth profile.",
+                    "enableCondition": [
+                      {"authenticationScheme": "OAUTH2"}
+                    ]
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "oidcIdToken",
+                    "displayName": "OIDC ID Token",
+                    "inputType": "string",
+                    "defaultValue": "",
+                    "required": "false",
+                    "helpTip": "Optional OIDC ID token. Used in the OAuth client-role profile. Provide either this, an access token, or both.",
+                    "enableCondition": [
+                      {"authenticationScheme": "OAUTH2"}
+                    ]
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "oauth2IssuerIdentifier",
+                    "displayName": "OAuth2 Issuer Identifier",
+                    "inputType": "string",
+                    "defaultValue": "",
+                    "required": "false",
+                    "helpTip": "Optional issuer URI used to disambiguate when the broker has multiple OAuth profiles and the issuer can't be derived from the token. Leave blank for single-profile setups.",
+                    "enableCondition": [
+                      {"authenticationScheme": "OAUTH2"}
+                    ]
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "clientName",
+                    "displayName": "Client Name",
+                    "inputType": "string",
+                    "defaultValue": "",
+                    "required": "false",
+                    "helpTip": "Unique client name for the session (auto-generated if not provided)."
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "attributeGroup",
+            "value": {
+              "groupName": "Connection Settings",
+              "elements": [
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "connectionTimeout",
+                    "displayName": "Connection Timeout (ms)",
+                    "inputType": "string",
+                    "defaultValue": "30000",
+                    "required": "false",
+                    "helpTip": "Connection timeout in milliseconds."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "readTimeout",
+                    "displayName": "Read Timeout (ms)",
+                    "inputType": "string",
+                    "defaultValue": "10000",
+                    "required": "false",
+                    "helpTip": "Read timeout in milliseconds."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "connectRetries",
+                    "displayName": "Connect Retries",
+                    "inputType": "string",
+                    "defaultValue": "3",
+                    "required": "false",
+                    "helpTip": "Number of connection retry attempts."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "connectRetriesPerHost",
+                    "displayName": "Connect Retries Per Host",
+                    "inputType": "string",
+                    "defaultValue": "0",
+                    "required": "false",
+                    "helpTip": "Number of connection retries per host."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "reconnectRetries",
+                    "displayName": "Reconnect Retries",
+                    "inputType": "string",
+                    "defaultValue": "3",
+                    "required": "false",
+                    "helpTip": "Number of reconnection retry attempts."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "reconnectRetryWait",
+                    "displayName": "Reconnect Retry Wait (ms)",
+                    "inputType": "string",
+                    "defaultValue": "3000",
+                    "required": "false",
+                    "helpTip": "Wait time between reconnection retries in milliseconds."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "compressionLevel",
+                    "displayName": "Compression Level",
+                    "inputType": "string",
+                    "defaultValue": "0",
+                    "required": "false",
+                    "helpTip": "Compression level (0-9). 0 disables compression."
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "SSL/TLS Security",
+        "elements": [
+          {
+            "type": "attributeGroup",
+            "value": {
+              "groupName": "Trust Store (Server Authentication)",
+              "isCollapsed": true,
+              "elements": [
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "sslTrustStorePath",
+                    "displayName": "Trust Store Path",
+                    "inputType": "string",
+                    "defaultValue": "",
+                    "required": "false",
+                    "helpTip": "Path to the SSL trust store file containing CA certificates for broker validation."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "sslTrustStorePassword",
+                    "displayName": "Trust Store Password",
+                    "inputType": "string",
+                    "defaultValue": "",
+                    "required": "false",
+                    "helpTip": "Password for the SSL trust store."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "sslTrustStoreFormat",
+                    "displayName": "Trust Store Format",
+                    "inputType": "string",
+                    "defaultValue": "JKS",
+                    "required": "false",
+                    "helpTip": "Format of the SSL trust store (e.g., JKS, PKCS12)."
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "attributeGroup",
+            "value": {
+              "groupName": "Key Store (Client Authentication)",
+              "isCollapsed": true,
+              "enableCondition": [
+                {"authenticationScheme": "CLIENT_CERTIFICATE"}
+              ],
+              "elements": [
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "sslKeyStorePath",
+                    "displayName": "Key Store Path",
+                    "inputType": "string",
+                    "defaultValue": "",
+                    "required": "false",
+                    "helpTip": "Path to the SSL key store file containing client certificates for mutual TLS."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "sslKeyStorePassword",
+                    "displayName": "Key Store Password",
+                    "inputType": "string",
+                    "defaultValue": "",
+                    "required": "false",
+                    "helpTip": "Password for the SSL key store."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "sslKeyStoreFormat",
+                    "displayName": "Key Store Format",
+                    "inputType": "string",
+                    "defaultValue": "JKS",
+                    "required": "false",
+                    "helpTip": "Format of the SSL key store (e.g., JKS, PKCS12)."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "sslKeyPassword",
+                    "displayName": "Private Key Password",
+                    "inputType": "string",
+                    "defaultValue": "",
+                    "required": "false",
+                    "helpTip": "Password for the SSL private key."
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "type": "attributeGroup",
+            "value": {
+              "groupName": "Certificate Validation",
+              "elements": [
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "sslValidateCertificate",
+                    "displayName": "Validate Certificate",
+                    "inputType": "boolean",
+                    "defaultValue": true,
+                    "required": "false",
+                    "helpTip": "Whether to validate the server certificate."
+                  }
+                },
+                {
+                  "type": "attribute",
+                  "value": {
+                    "name": "sslValidateCertificateDate",
+                    "displayName": "Validate Certificate Date",
+                    "inputType": "boolean",
+                    "defaultValue": true,
+                    "required": "false",
+                    "helpTip": "Whether to validate the certificate expiration date."
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "Advanced Message Options",
+        "isCollapsed": true,
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "generateSendTimestamps",
+              "displayName": "Generate Send Timestamps",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "required": "false",
+              "helpTip": "Whether to automatically generate send timestamps on messages."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "generateSequenceNumbers",
+              "displayName": "Generate Sequence Numbers",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "required": "false",
+              "helpTip": "Whether to automatically generate sequence numbers on messages."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "calculateMessageExpiration",
+              "displayName": "Calculate Message Expiration",
+              "inputType": "boolean",
+              "defaultValue": false,
+              "required": "false",
+              "helpTip": "Whether to calculate message expiration based on TTL."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

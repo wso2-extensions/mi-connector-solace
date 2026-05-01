@@ -1,0 +1,38 @@
+{
+  "connectorName": "solace",
+  "operationName": "beginTransaction",
+  "title": "Begin Transaction",
+  "help": "Starts a new local transaction on the Solace connection. Subsequent solace.publishMessage calls participate atomically. End with solace.commit or solace.rollback.",
+  "elements": [
+    {
+      "type": "attributeGroup",
+      "value": {
+        "groupName": "General",
+        "elements": [
+          {
+            "type": "attribute",
+            "value": {
+              "name": "configRef",
+              "displayName": "Solace Connection",
+              "inputType": "connection",
+              "allowedConnectionTypes": ["SOLACE"],
+              "required": true,
+              "helpTip": "Select an existing Solace connection."
+            }
+          },
+          {
+            "type": "attribute",
+            "value": {
+              "name": "transactionTimeoutMillis",
+              "displayName": "Transaction Timeout (ms)",
+              "inputType": "string",
+              "defaultValue": "60000",
+              "required": false,
+              "helpTip": "Auto-rollback after this many ms if commit/rollback isn't reached. Prevents leaks from forgotten or faulted sequences."
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

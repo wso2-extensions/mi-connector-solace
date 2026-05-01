@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2026, WSO2 LLC. (http://www.wso2.org).
+  ~
+  ~ WSO2 LLC. licenses this file to you under the Apache License,
+  ~ Version 2.0 (the "License"); you may not use this file except
+  ~ in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~ http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing,
+  ~ software distributed under the License is distributed on an
+  ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  ~ KIND, either express or implied. See the License for the
+  ~ specific language governing permissions and limitations
+  ~ under the License.
+  -->
+<component name="consume" displayName="Consume" type="synapse/template">
+    <subComponents>
+        <component name="poll">
+            <file>poll.xml</file>
+            <displayName>Poll Message</displayName>
+            <description>Synchronously polls one message from a queue. Returns null on timeout. Inside beginTransaction settlement is deferred to commit/rollback (at-least-once); outside a transaction the message is acked on receipt (at-most-once).</description>
+        </component>
+        <component name="browse">
+            <file>browse.xml</file>
+            <displayName>Browse Queue</displayName>
+            <description>Browses messages on a queue without consuming them. Useful for diagnostics and DLQ inspection.</description>
+        </component>
+        <component name="requestCachedMessages">
+            <file>requestCachedMessages.xml</file>
+            <displayName>Request Cached Messages</displayName>
+            <description>Requests historical messages from a PubSub+ Cache Instance for a topic. Requires a cache instance to be deployed and configured for the requested topic pattern.</description>
+        </component>
+    </subComponents>
+</component>
