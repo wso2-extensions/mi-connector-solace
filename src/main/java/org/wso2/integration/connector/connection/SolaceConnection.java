@@ -53,16 +53,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.synapse.MessageContext;
 import org.wso2.integration.connector.SolaceFault;
 import org.wso2.integration.connector.constants.SolaceConstants;
 import org.wso2.integration.connector.core.ConnectException;
 import org.wso2.integration.connector.core.connection.Connection;
 import org.wso2.integration.connector.core.connection.ConnectionConfig;
 import org.wso2.integration.connector.core.connection.ConnectionHandler;
-import org.wso2.integration.connector.hooks.Hooks;
 import org.wso2.integration.connector.models.PublishResult;
-import org.wso2.integration.connector.models.SolaceMessageProperties;
 import org.wso2.integration.connector.utils.Backoff;
 
 import static org.wso2.integration.connector.constants.SolaceConstants.CONNECTOR_NAME;
@@ -528,7 +525,7 @@ public class SolaceConnection implements Connection {
                     throw e;
                 }
             } else {
-                log.info("Reusing existing transacted session on connection: " + connectionId);
+                log.debug("Reusing existing transacted session on connection: " + connectionId);
             }
             return txSession;
         }
@@ -543,8 +540,9 @@ public class SolaceConnection implements Connection {
             }
             log.debug("Committing transacted session on connection: " + connectionId);
             try {
+                closeTransactedFlowsInternal();
                 txSession.commit();
-                log.info("Transaction committed on connection: " + connectionId);
+                log.debug("Transaction committed on connection: " + connectionId);
             } catch (JCSMPException e) {
                 log.error("Transacted session commit failed on connection: " + connectionId
                         + ": " + e.getMessage(), e);
@@ -565,6 +563,7 @@ public class SolaceConnection implements Connection {
             }
             log.debug("Rolling back transacted session on connection: " + connectionId);
             try {
+                closeTransactedFlowsInternal();
                 txSession.rollback();
                 log.warn("Transaction rolled back on connection: " + connectionId);
             } catch (JCSMPException e) {
@@ -584,9 +583,12 @@ public class SolaceConnection implements Connection {
         }
     }
 
-    private void closeTransactedSessionInternal() {
-        // Close any transacted FlowReceivers first — they live on the txSession and would
-        // otherwise be orphaned by closing the session out from under them.
+    /**
+     * Closes the transacted flows. The commit and the rollback call it before they complete the transaction: a flow
+     * still open while they run takes the next message into its window, or the rolled back message again, and its close
+     * then returns that message with one more delivery counted on the broker.
+     */
+    private void closeTransactedFlowsInternal() {
         if (!txFlowReceivers.isEmpty()) {
             for (Map.Entry<String, TxFlowEntry> entry : txFlowReceivers.entrySet()) {
                 try {
@@ -599,6 +601,11 @@ public class SolaceConnection implements Connection {
             }
             txFlowReceivers.clear();
         }
+    }
+
+    private void closeTransactedSessionInternal() {
+        // The transacted flows live on the txSession, so they are closed before it.
+        closeTransactedFlowsInternal();
         if (txProducer != null) {
             txProducer.close();
             txProducer = null;
@@ -615,10 +622,7 @@ public class SolaceConnection implements Connection {
         }
     }
 
-    public PublishResult publishTransacted(String destinationType, String destinationName,
-                                       String payload, String deliveryMode, String messageType,
-                                       SolaceMessageProperties properties, String httpContentType,
-                                       MessageContext synCtx)
+    public PublishResult publishTransacted(String destinationType, String destinationName, BytesXMLMessage msg)
         throws JCSMPException {
         synchronized (txLock) {
             if (txProducer == null) {
@@ -629,12 +633,6 @@ public class SolaceConnection implements Connection {
                     + connectionId);
             }
             Destination destination = MessageBuilder.resolveDestination(destinationType, destinationName);
-            BytesXMLMessage msg = MessageBuilder.createMessage(messageType, payload, synCtx);
-            if (httpContentType != null && !httpContentType.isEmpty()) {
-                msg.setHTTPContentType(httpContentType);
-            }
-            msg.setDeliveryMode(MessageBuilder.resolveDeliveryMode(deliveryMode));
-            MessageBuilder.applyMessageProperties(msg, properties);
             // Stable correlation key per transacted publish — surfaced in the PublishResult and
             // visible in broker-side message-spool browsing for "where did this message go" diagnostics.
             String correlationKey = "tx-" + connectionId + "-" + UUID.randomUUID();
@@ -684,7 +682,7 @@ public class SolaceConnection implements Connection {
      * @return the received message, or null on timeout
      * @throws JCSMPException if no transacted session is active, or flow setup / receive fails
      */
-    public BytesXMLMessage pollTransacted(String queueName, long timeoutMillis, String selector)
+    public BytesXMLMessage pollTransacted(String queueName, int timeoutMillis, String selector)
             throws JCSMPException {
         synchronized (txLock) {
             if (txSession == null) {
@@ -716,6 +714,11 @@ public class SolaceConnection implements Connection {
                 FlowReceiver receiver = txSession.createFlow(null, flowProps, endpointProps);
                 entry = new TxFlowEntry(receiver, normalizedSelector);
                 txFlowReceivers.put(queueName, entry);
+                // Once per transacted flow bind. We cannot read the queue's settings through JCSMP.
+                log.warn("transacted mode relies on the queue's maximum redelivery count, a DMQ and max delivered"
+                        + " unacknowledged messages per flow set to 1 for poison messages; this connection cannot"
+                        + " verify the queue's settings through JCSMP, and provisioning with 'ignore already exists'"
+                        + " does not change an existing queue; confirm them on the broker");
             } else if (!java.util.Objects.equals(entry.selector, normalizedSelector)) {
                 // JCSMP binds the selector at flow-creation time. Silently ignoring the new
                 // selector and reusing a flow with a different filter would be a correctness
@@ -728,7 +731,7 @@ public class SolaceConnection implements Connection {
                         + " use only one selector per queue within a single transaction.");
             }
 
-            return entry.receiver.receive((int) timeoutMillis);
+            return entry.receiver.receive(timeoutMillis);
         }
     }
 
@@ -806,7 +809,7 @@ public class SolaceConnection implements Connection {
      * @return a list of browsed messages (never null, may be empty)
      * @throws JCSMPException if browser creation fails
      */
-    public List<BytesXMLMessage> browseQueue(String queueName, int maxMessages, long timeoutMillis,
+    public List<BytesXMLMessage> browseQueue(String queueName, int maxMessages, int timeoutMillis,
                                              String selector) throws JCSMPException {
         Queue queue = JCSMPFactory.onlyInstance().createQueue(queueName);
 
@@ -822,9 +825,8 @@ public class SolaceConnection implements Connection {
             browser = session.createBrowser(browserProps);
             // getNext blocks up to timeoutMillis. A null return means "nothing more right now",
             // which is the natural stop condition for a one-shot browse — keep simple.
-            int browseTimeoutInt = (int) Math.min(timeoutMillis, Integer.MAX_VALUE);
             for (int i = 0; i < maxMessages; i++) {
-                BytesXMLMessage msg = browser.getNext(browseTimeoutInt);
+                BytesXMLMessage msg = browser.getNext(timeoutMillis);
                 if (msg == null) {
                     break;
                 }
@@ -1165,9 +1167,9 @@ public class SolaceConnection implements Connection {
             }
             if (sessionToClose != null) {
                 try {
-                    Hooks.get().point("closer.beforeClose", sessionToClose);
-                    SolaceLogicalConnection.closeQuietly(sessionToClose);
-                    log.info("Solace connection closed: " + connectionId);
+                    if (lc.closeAndConfirm(sessionToClose)) {
+                        log.info("Solace connection closed: " + connectionId);
+                    }
                 } finally {
                     // The installed session's slot goes back once its close finished, not when the holder left
                     // the pool.
