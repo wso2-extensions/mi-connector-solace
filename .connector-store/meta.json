@@ -3,7 +3,7 @@
     "owner": "WSO2",
     "product": "MI",
     "category": "Developer Tools",
-    "documentationUrl": "",
+    "documentationUrl": "https://mi.docs.wso2.com/en/latest/reference/connectors/solace-connector/solace-connector-overview/",
     "mavenGroupId": "org.wso2.integration.connector",
     "mavenArtifactId": "mi-connector-solace",
     "description": "The Solace connector enables WSO2 Micro Integrator (MI) to publish messages and interact with Solace PubSub+ brokers. It supports reliable, asynchronous communication, allowing you to send messages to topics or queues, use request/reply patterns, and manage acknowledgments.",
